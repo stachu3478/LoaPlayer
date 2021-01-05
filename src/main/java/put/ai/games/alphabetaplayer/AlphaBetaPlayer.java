@@ -22,7 +22,7 @@ public class AlphaBetaPlayer extends Player {
     @Override
     public Move nextMove(Board b) {
         if (!init) doInit(b);
-        return alpha(b);
+        return alpha(b.clone());
     }
 
     private void doInit(Board b) {
@@ -33,14 +33,19 @@ public class AlphaBetaPlayer extends Player {
     private Move alpha(Board b) {
         List<Move> myMoves = b.getMovesFor(getColor());
         Move bestMove = myMoves.get(0);
-        int bestRank = 0;
+        int bestRank = Integer.MIN_VALUE;
+        boolean replaced = false;
         for (Move m : myMoves) {
             int r = rank(b, m);
             if (r > bestRank) {
                 bestRank = r;
                 bestMove = m;
+                replaced = true;
             }
         }
+        if (bestRank == 0) System.out.println("Warning: Zero valued rank");
+        if (!replaced) System.out.println("Warning: Zero indexed move");
+        System.out.println("test");
         return bestMove;
     }
 
@@ -58,7 +63,8 @@ public class AlphaBetaPlayer extends Player {
         for (int x = 0; x < indexer.getSize(); x++) {
             for (int y = 0; y < indexer.getSize(); y++) {
                 if (color != indexer.getColor(x, y)) continue;
-                if (indexer.find(color, x, y)) state++;
+                state -= 8;
+                state += indexer.getConnectable(color, x, y, getOpponent(getColor()));
             }
         }
         return state;

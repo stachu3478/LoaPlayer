@@ -35,21 +35,21 @@ public class BoardIndexer {
         createMoveIndexes(b);
     }
 
-    public boolean find(Color c, int x, int y) {
-        int pxMax = Math.min(boardMaxField, x + mixRows[y]);
-        for (int px = Math.max(0, x - mixRows[y]); px <= pxMax; px++)
-            if (c == boardSnaphot[px][y]) return true;
-        int pyMax = Math.min(boardMaxField, y + mixCols[x]);
-        for (int py = Math.max(0, y - mixCols[x]); py <= pyMax; py++)
-            if (c == boardSnaphot[x][py]) return true;
-        int waMax = Math.min(boardMaxField - x, Math.min(boardMaxField - y, mixLurdWedges[boardSize + x - y]));
-        for (int wa = -Math.min(x, Math.min(y, mixLurdWedges[boardSize + x - y])); wa <= waMax; wa++)
-            if (c == boardSnaphot[x + wa][y + wa]) return true;
-        int wbMax = Math.min(x, Math.min(boardMaxField - y, mixLdruWedges[x + y]));
-        for (int wb = -Math.min(boardMaxField - x, Math.min(y, mixLdruWedges[x + y])); wb <= wbMax; wb++)
-            if (c == boardSnaphot[x - wb][y + wb]) return true;
-         return false;
+    public int getConnectable(Color c, int x, int y, Color o) {
+        int connectable = 0;
+        Walker walker = new Walker(x, y, boardSize, boardSnaphot);
+        connectable += walker.towards(1, 0, mixRows[y], c, o);
+        connectable += walker.towards(-1, 0, mixRows[y], c, o);
+        connectable += walker.towards(0, 1, mixCols[x], c, o);
+        connectable += walker.towards(0, -1, mixCols[x], c, o);
+        connectable += walker.towards(-1, -1, mixLurdWedges[boardSize + x - y], c, o);
+        connectable += walker.towards(1, 1, mixLurdWedges[boardSize + x - y], c, o);
+        connectable += walker.towards(1, -1, mixLdruWedges[x + y], c, o);
+        connectable += walker.towards(-1, 1, mixLdruWedges[x + y], c, o);
+         return connectable;
     }
+
+
 
     private void makeBoardSnapshot(Board b) {
         for (int x = 0; x < boardSize; x++) {
@@ -76,6 +76,28 @@ public class BoardIndexer {
                     mixLdruWedges[x + y]++;
                 }
             }
+        }
+    }
+
+    private class Walker {
+        private int x;
+        private int y;
+        private int boardSize;
+        private Color[][] boardSnaphot;
+
+        public Walker(int x, int y, int boardSize, Color[][] boardSnaphot) {
+            this.x = x;
+            this.y = y;
+            this.boardSize = boardSize;
+            this.boardSnaphot = boardSnaphot;
+        }
+
+        private int towards(int xd, int yd, int times, Color c, Color o) {
+            for (int px = x, py = y, i = 0; i < times && px > 0 && py > 0 && px < boardSize && py < boardSize; px += xd, py += yd, i++) {
+                if (c == boardSnaphot[px][py]) return 1;
+                if (o == boardSnaphot[px][py]) return 0;
+            }
+            return 0;
         }
     }
 }
