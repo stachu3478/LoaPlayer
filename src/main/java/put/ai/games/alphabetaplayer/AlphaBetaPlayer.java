@@ -42,7 +42,6 @@ public class AlphaBetaPlayer extends Player {
     private static class AlphaBeta {
         private final TimeWatchdog watchdog;
         private final Board board;
-        private int depth;
         private boolean isEckhausted;
         private final Color me;
         private final BoardIndexer indexer;
@@ -90,7 +89,7 @@ public class AlphaBetaPlayer extends Player {
                 for (int y = 0; y < indexer.getSize(); y++) {
                     if (color != indexer.getColor(x, y)) continue;
                     state -= 8;
-                    state += indexer.getConnectable(color, x, y, getOpponent(me));
+                    state += indexer.getConnectable(color, x, y, getOpponent(color));
                 }
             }
             return state;
