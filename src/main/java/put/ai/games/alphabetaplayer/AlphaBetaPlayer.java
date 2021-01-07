@@ -37,7 +37,10 @@ public class AlphaBetaPlayer extends Player {
     }
 
     @Override
-    public Move nextMove(Board b) {
+    public Move nextMove(Board board) {
+        Board b = board.clone();
+        List<Move> moves = b.getMovesFor(getColor());
+        Move shortestToWin = moves.get(0);
         Timer timer = new Timer();
         final AtomicBoolean[] timeAvailable = {new AtomicBoolean(true)};
         timer.schedule(new TimerTask() {
@@ -46,15 +49,17 @@ public class AlphaBetaPlayer extends Player {
                 timeAvailable[0].set(false);
             }
         }, getTime() - 1000);
-        List<Move> moves = b.getMovesFor(getColor());
-        Move shortestToWin = moves.get(0);
         int shortestLength = Integer.MAX_VALUE;
         while (timeAvailable[0].get()) {
             Move move = moves.get(random.nextInt(moves.size()));
             depth = 0;
-            if (canBeWinning(b, move, getColor()) && shortestLength > depth) {
-                shortestToWin = move;
-                shortestLength = depth;
+            try {
+                if (canBeWinning(b, move, getColor()) && shortestLength > depth) {
+                    shortestToWin = move;
+                    shortestLength = depth;
+                }
+            } catch (IllegalArgumentException e) {
+                System.err.println(e.toString());
             }
         }
         System.out.println(jokes[random.nextInt(jokes.length)]);
