@@ -76,4 +76,12 @@ public class AlphaBetaPlayer extends Player {
         b.undoMove(move);
         return foundWinning;
     }
+
+    private class WeightedRandom {
+        private float[] weights;
+
+        public WeightedRandom(int size) {
+
+        }
+    }
 }
