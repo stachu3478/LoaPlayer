@@ -14,6 +14,7 @@ import put.ai.games.game.Player;
 public class AlphaBetaPlayer extends Player {
     private BoardIndexer indexer;
     private boolean init = false;
+    private final Random random = new Random(0xdeadbeef);
 
     @Override
     public String getName() {
@@ -22,8 +23,21 @@ public class AlphaBetaPlayer extends Player {
 
     @Override
     public Move nextMove(Board b) {
-        if (!init) doInit(b);
-        return alpha(b.clone());
+        List<Move> moves = b.getMovesFor(getColor());
+        while (true) {
+            Move move = moves.get(random.nextInt(moves.size()));
+            if (canBeWinning(b, move, getColor())) return move;
+        }
+    }
+
+    private boolean canBeWinning(Board b, Move move, Color current) {
+        if (b.getWinner(current) == getColor()) return true;
+        b.doMove(move);
+        List<Move> moves = b.getMovesFor(getOpponent(current));
+        if (moves.size() == 0) return false;
+        boolean foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), getOpponent(current));
+        b.undoMove(move);
+        return foundWinning;
     }
 
     private void doInit(Board b) {
