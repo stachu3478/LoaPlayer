@@ -101,11 +101,13 @@ public class AlphaBetaPlayer extends Player {
                     isEckhausted = true;
                     float bestValue = -1;
                     for (Move move : moves) {
-                        float result = run(getOpponent(me), depth, -64 * board.getSize(), 64 * board.getSize());
+                        board.doMove(move);
+                        float result = -run(getOpponent(me), depth, -64 * board.getSize(), 64 * board.getSize());
                         if (result > bestValue) {
                             bestValue = result;
                             bestMove = move;
                         }
+                        board.undoMove(move);
                     }
                     System.out.println("Best val: " + bestValue);
                     bestMove1 = bestMove;
@@ -138,9 +140,9 @@ public class AlphaBetaPlayer extends Player {
             if( moves.size() == 0 || depth == 0 ) {
                 if (moves.size() != 0) isEckhausted = false;
                 Color winner = board.getWinner(color);
-                if (winner == color) return 64 * board.getSize();
-                if (winner == null) return new Labeller(board, color).run() - new Labeller(board, getOpponent(color)).run();
-                return -64 * board.getSize();
+                if (winner == me) return -64 * board.getSize();
+                if (winner == null) return new Labeller(board, getOpponent(me)).run() - new Labeller(board, me).run();
+                return 64 * board.getSize();
             }
             for(Move move : moves) {
                 board.doMove(move);
