@@ -4,9 +4,11 @@
  */
 package put.ai.games.alphabetaplayer;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import put.ai.games.game.Board;
 import put.ai.games.game.Move;
 import put.ai.games.game.Player;
@@ -23,7 +25,15 @@ public class AlphaBetaPlayer extends Player {
     @Override
     public Move nextMove(Board b) {
         // if (!init) doInit(b);
-        return new AlphaBeta(b, getColor(), () -> getTime() > 100).process();
+        Timer timer = new Timer();
+        final AtomicBoolean[] timeLow = {new AtomicBoolean(true)};
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                timeLow[0].set(false);
+            }
+        }, getTime() - 100);
+        return new AlphaBeta(b, getColor(), () -> timeLow[0].get()).process();
     }
 
     private void doInit(Board b) {
@@ -92,10 +102,12 @@ public class AlphaBetaPlayer extends Player {
         }
 
         public Move process() {
+            List<Move> moves = board.getMovesFor(me);
+            this.bestMove = moves.get(0);
             int depth = 1;
             try {
                 while (true) {
-                    List<Move> moves = board.getMovesFor(me);
+
                     Move bestMove = moves.get(0);
                     isEckhausted = true;
                     for (Move move : moves) {
