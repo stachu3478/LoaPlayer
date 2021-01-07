@@ -15,9 +15,6 @@ import put.ai.games.game.Move;
 import put.ai.games.game.Player;
 
 public class AlphaBetaPlayer extends Player {
-    private BoardIndexer indexer;
-    private boolean init = false;
-
     @Override
     public String getName() {
         return "Stanisław Graczyk 146889 Wojciech Kamiński 141242";
@@ -25,7 +22,6 @@ public class AlphaBetaPlayer extends Player {
 
     @Override
     public Move nextMove(Board b) {
-        // if (!init) doInit(b);
         Timer timer = new Timer();
         final AtomicBoolean[] timeLow = {new AtomicBoolean(true)};
         timer.schedule(new TimerTask() {
@@ -35,39 +31,6 @@ public class AlphaBetaPlayer extends Player {
             }
         }, getTime() - 100);
         return new AlphaBeta(b, getColor(), () -> timeLow[0].get()).process();
-    }
-
-    private void doInit(Board b) {
-        init = true;
-        indexer = new BoardIndexer(b);
-    }
-
-    private Move alpha(Board b) {
-        List<Move> myMoves = b.getMovesFor(getColor());
-        Move bestMove = myMoves.get(0);
-        int bestRank = Integer.MIN_VALUE;
-        boolean replaced = false;
-        for (Move m : myMoves) {
-            int r = rank(b, m);
-            if (r > bestRank) {
-                bestRank = r;
-                bestMove = m;
-                replaced = true;
-            }
-        }
-        if (bestRank == 0) System.out.println("Warning: Zero valued rank");
-        if (!replaced) System.out.println("Warning: Zero indexed move");
-        System.out.println("test");
-        return bestMove;
-    }
-
-    private int rank(Board b, Move m) {
-        b.doMove(m);
-        indexer.fetch(b);
-        // ranking code goes here
-        int ranking = 0;//groupState(getColor()) - groupState(getOpponent(getColor()));
-        b.undoMove(m);
-        return ranking;
     }
 
     public interface TimeWatchdog {
@@ -82,7 +45,7 @@ public class AlphaBetaPlayer extends Player {
         private int depth;
         private boolean isEckhausted;
         private final Color me;
-        private BoardIndexer indexer;
+        private final BoardIndexer indexer;
 
         public AlphaBeta(Board board, Color me, TimeWatchdog watchdog) {
             this.board = board.clone();
@@ -152,61 +115,6 @@ public class AlphaBetaPlayer extends Player {
                 if( alpha >= beta ) return beta; // cutoff
             } //endfor
             return alpha;
-        }
-
-        private static class Labeller {
-            private HashMap<Integer, Integer> labels = new HashMap<>();
-            private final Board board;
-            private final Color color;
-            private int labelled;
-            private int totalLabelled;
-
-            public Labeller(Board board, Color color) {
-                labels = new HashMap<>();
-                this.board = board;
-                this.color = color;
-                totalLabelled = 0;
-            }
-
-            public float run() {
-                int label = 0;
-                int maxLabelled = 0;
-                for (int x = 0; x < board.getSize(); x++) {
-                    for (int y = 0; y < board.getSize(); y++) {
-                        if (board.getState(x, y) == color && !labels.containsKey(x * board.getSize() + y)) {
-                            labelled = 1;
-                            totalLabelled++;
-                            putRecursiveLabel(label++, x, y);
-                            if (labelled > maxLabelled) maxLabelled = labelled;
-                        }
-                    }
-                }
-                if (maxLabelled == 0 || totalLabelled == 0) {
-                    System.out.println("Warning: No colors found on the board");
-                    return 0;
-                }
-                return (float)maxLabelled / (float)totalLabelled;
-            }
-
-            private void putRecursiveLabel(int label, int x, int y) {
-                checkAndPutLabel(label, x - 1, y);
-                checkAndPutLabel(label, x + 1, y);
-                checkAndPutLabel(label, x, y - 1);
-                checkAndPutLabel(label, x, y + 1);
-                checkAndPutLabel(label, x - 1, y - 1);
-                checkAndPutLabel(label, x - 1, y + 1);
-                checkAndPutLabel(label, x + 1, y - 1);
-                checkAndPutLabel(label, x + 1, y + 1);
-            }
-
-            private void checkAndPutLabel(int label, int x, int y) {
-                if (board.getState(x, y) == color && !labels.containsKey(x * board.getSize() + y)) {
-                    labels.put(x * board.getSize() + y, label);
-                    labelled++;
-                    totalLabelled++;
-                    putRecursiveLabel(label, x, y);
-                }
-            }
         }
     }
 
