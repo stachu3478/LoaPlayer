@@ -99,7 +99,7 @@ public class AlphaBetaPlayer extends Player {
                 while (true) {
                     Move bestMove = moves.get(0);
                     isEckhausted = true;
-                    float bestValue = -1;
+                    float bestValue = Float.MIN_VALUE;
                     for (Move move : moves) {
                         board.doMove(move);
                         float result = -run(getOpponent(me), depth, -64 * board.getSize(), 64 * board.getSize());
@@ -141,7 +141,7 @@ public class AlphaBetaPlayer extends Player {
                 if (moves.size() != 0) isEckhausted = false;
                 Color winner = board.getWinner(color);
                 if (winner == me) return -64 * board.getSize();
-                if (winner == null) return new Labeller(board, getOpponent(me)).run() - new Labeller(board, me).run();
+                if (winner == null) return groupState(getOpponent(me)) - groupState(me);
                 return 64 * board.getSize();
             }
             for(Move move : moves) {
