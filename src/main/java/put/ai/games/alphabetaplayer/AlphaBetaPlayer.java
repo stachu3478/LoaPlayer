@@ -22,8 +22,8 @@ public class AlphaBetaPlayer extends Player {
 
     @Override
     public Move nextMove(Board b) {
-        if (!init) doInit(b);
-        return alpha(b.clone());
+        // if (!init) doInit(b);
+        return new AlphaBeta(b, getColor(), () -> getTime() > 100).process();
     }
 
     private void doInit(Board b) {
@@ -69,6 +69,73 @@ public class AlphaBetaPlayer extends Player {
             }
         }
         return state;
+    }
+
+    public interface TimeWatchdog {
+        boolean call();
+    }
+
+    public static class TimeoutException extends RuntimeException {}
+
+    private static class AlphaBeta {
+        private final TimeWatchdog watchdog;
+        private final Board board;
+        private int depth;
+        private boolean isEckhausted;
+        private Move bestMove;
+        private final Color me;
+
+        public AlphaBeta(Board board, Color me, TimeWatchdog watchdog) {
+            this.board = board.clone();
+            this.watchdog = watchdog;
+            this.me = me;
+        }
+
+        public Move process() {
+            int depth = 1;
+            try {
+                while (true) {
+                    List<Move> moves = board.getMovesFor(me);
+                    Move bestMove = moves.get(0);
+                    isEckhausted = true;
+                    for (Move move : moves) {
+                        int bestValue = -1;
+                        int result = run(getOpponent(me), depth, -1, 1);
+                        if (result > bestValue) {
+                            bestValue = result;
+                            bestMove = move;
+                        }
+                    }
+                    this.bestMove = bestMove;
+                    if (isEckhausted) break;
+                    depth++;
+                }
+            } catch (TimeoutException e) {
+                System.out.println("Depth reached " + (depth - 1));
+            }
+            return bestMove;
+        }
+
+        private int run(Color color, int depth, int alpha, int beta)
+        {
+            if (!watchdog.call()) throw new TimeoutException();
+            List<Move> moves = board.getMovesFor(color);
+            if( moves.size() == 0 || depth == 0 ) {
+                if (depth == 0 && moves.size() != 0) isEckhausted = false;
+                Color winner = board.getWinner(color);
+                if (winner == me) return 1;
+                if (winner == null) return 0;
+                return -1;
+            }
+            for(Move move : moves) {
+                board.doMove(move);
+                int val = -run(getOpponent(color), depth - 1, -beta, -alpha);
+                board.undoMove(move);
+                if( val > alpha ) alpha = val; // alpha=max(val,alpha);
+                if( alpha >= beta ) return beta; // cutoff
+            } //endfor
+            return alpha;
+        }
     }
 
     private static class BoardIndexer {
