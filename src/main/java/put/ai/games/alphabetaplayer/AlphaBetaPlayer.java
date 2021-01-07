@@ -4,6 +4,7 @@
  */
 package put.ai.games.alphabetaplayer;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import put.ai.games.game.Board;
@@ -70,18 +71,16 @@ public class AlphaBetaPlayer extends Player {
         return state;
     }
 
-    private class BoardIndexer {
-        private int[] mixRows;
-        private int[] mixCols;
-        private int[] mixLurdWedges;
-        private int[] mixLdruWedges;
-        private int boardSize;
-        private int boardMaxField;
-        private Color[][] boardSnaphot;
+    private static class BoardIndexer {
+        private final int[] mixRows;
+        private final int[] mixCols;
+        private final int[] mixLurdWedges;
+        private final int[] mixLdruWedges;
+        private final int boardSize;
+        private final Color[][] boardSnaphot;
 
         public BoardIndexer(Board b) {
             boardSize = b.getSize();
-            boardMaxField = boardSize - 1;
             mixRows = new int[boardSize];
             mixCols = new int[boardSize];
             mixLurdWedges = new int[boardSize * 2];
@@ -146,11 +145,11 @@ public class AlphaBetaPlayer extends Player {
             }
         }
 
-        private class Walker {
-            private int x;
-            private int y;
-            private int boardSize;
-            private Color[][] boardSnaphot;
+        private static class Walker {
+            private final int x;
+            private final int y;
+            private final int boardSize;
+            private final Color[][] boardSnaphot;
 
             public Walker(int x, int y, int boardSize, Color[][] boardSnaphot) {
                 this.x = x;
