@@ -102,33 +102,41 @@ public class AlphaBetaPlayer extends Player {
         }
 
         private static class Labeller {
-            private HashMap<Integer, Integer> labels = new HashMap<>();
+            private final HashMap<Integer, Integer> labels;
             private final Board board;
             private final Color color;
             private int labelled;
             private int totalLabelled;
+            private final int[] fourMax;
+            private int minMax = 0;
+            private int minI = 0;
 
             public Labeller(Board board, Color color) {
                 labels = new HashMap<>();
                 this.board = board;
                 this.color = color;
                 totalLabelled = 0;
+                fourMax = new int[4];
+                fourMax[0] = 0;
+                fourMax[1] = 0;
+                fourMax[2] = 0;
+                fourMax[3] = 0;
             }
 
             public float run() {
                 int label = 0;
-                int maxLabelled = 0;
                 for (int x = 0; x < board.getSize(); x++) {
                     for (int y = 0; y < board.getSize(); y++) {
                         if (board.getState(x, y) == color && !labels.containsKey(x * board.getSize() + y)) {
                             labelled = 1;
                             totalLabelled++;
                             putRecursiveLabel(label++, x, y);
-                            if (labelled > maxLabelled) maxLabelled = labelled;
+                            verifyMax(labelled);
                         }
                     }
                 }
-                if (maxLabelled == 0 || totalLabelled == 0) {
+                int maxLabelled = fourMax[0] + fourMax[1] + fourMax[2] + fourMax[3] - label;
+                if (totalLabelled == 0) {
                     System.out.println("Warning: No colors found on the board");
                     return 0;
                 }
@@ -152,6 +160,18 @@ public class AlphaBetaPlayer extends Player {
                     labelled++;
                     totalLabelled++;
                     putRecursiveLabel(label, x, y);
+                }
+            }
+
+            private void verifyMax(int labelled) {
+                if (labelled < minMax) return;
+                fourMax[minI] = labelled;
+                minMax = Integer.MAX_VALUE;
+                for (int i = 0; i < 4; i++) {
+                    if (fourMax[i] < minMax) {
+                        minMax = fourMax[i];
+                        minI = i;
+                    }
                 }
             }
         }
