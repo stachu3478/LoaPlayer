@@ -4,10 +4,7 @@
  */
 package put.ai.games.alphabetaplayer;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import put.ai.games.game.Board;
@@ -53,8 +50,9 @@ public class AlphaBetaPlayer extends Player {
 
         public Move process() {
             List<Move> moves = board.getMovesFor(me);
+            Collections.shuffle(moves);
             Move bestMove1 = moves.get(0);
-            int depth = 1;
+            int depth = 0;
             try {
                 while (true) {
                     Move bestMove = moves.get(0);
@@ -62,11 +60,12 @@ public class AlphaBetaPlayer extends Player {
                     float bestValue = Float.MIN_VALUE;
                     for (Move move : moves) {
                         board.doMove(move);
-                        float result = -run(getOpponent(me), depth, -64 * board.getSize(), 64 * board.getSize());
+                        float result = -run(getOpponent(me), depth, Float.MIN_VALUE, Float.MAX_VALUE);
                         if (result > bestValue) {
                             bestValue = result;
                             bestMove = move;
                         }
+                        if (result >= Float.MAX_VALUE / 2) return move;
                         board.undoMove(move);
                     }
                     System.out.println("Best val: " + bestValue);
@@ -87,9 +86,9 @@ public class AlphaBetaPlayer extends Player {
             if( moves.size() == 0 || depth == 0 ) {
                 if (moves.size() != 0) isEckhausted = false;
                 Color winner = board.getWinner(color);
-                if (winner == me) return -64 * board.getSize();
+                if (winner == me) return Float.MIN_VALUE;
                 if (winner == null) return new Labeller(board, getOpponent(me)).run() - new Labeller(board, me).run();
-                return 64 * board.getSize();
+                return Float.MAX_VALUE;
             }
             for(Move move : moves) {
                 board.doMove(move);
