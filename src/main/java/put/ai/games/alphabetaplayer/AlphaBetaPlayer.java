@@ -53,25 +53,24 @@ public class AlphaBetaPlayer extends Player {
         while (timeAvailable[0].get()) {
             Move move = moves.get(random.nextInt(moves.size()));
             depth = 0;
-            try {
-                if (canBeWinning(b, move, getColor()) && shortestLength > depth) {
-                    shortestToWin = move;
-                    shortestLength = depth;
-                }
-            } catch (IllegalArgumentException e) {
-                System.err.println(e.toString());
+            if (canBeWinning(b, move, getColor()) && shortestLength > depth) {
+                shortestToWin = move;
+                shortestLength = depth;
             }
+            if (shortestLength == 1) return move;
         }
         System.out.println(jokes[random.nextInt(jokes.length)]);
         return shortestToWin;
     }
 
     private boolean canBeWinning(Board b, Move move, Color current) {
-        if (b.getWinner(current) == getColor()) return true;
+        Color winner = b.getWinner(current);
+            if (winner != null) {
+            return winner == getColor();
+        };
         b.doMove(move);
         depth++;
         List<Move> moves = b.getMovesFor(getOpponent(current));
-        if (moves.size() == 0) return false;
         boolean foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), getOpponent(current));
         b.undoMove(move);
         return foundWinning;
