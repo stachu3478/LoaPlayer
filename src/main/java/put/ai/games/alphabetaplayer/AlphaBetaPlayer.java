@@ -15,6 +15,7 @@ public class AlphaBetaPlayer extends Player {
     private final Random random = new Random(0xdeadbeef);
     private int depth;
     private int maxDepth;
+    private Color me;
     private final String[] jokes = {
         "Wybierz najkrótszą ścieżkę do zwycięstwa i nią podążaj!",
         "Połączmy siły we wspólną potęgę!",
@@ -52,6 +53,7 @@ public class AlphaBetaPlayer extends Player {
             }
         }, getTime() - 1000);
         maxDepth = Integer.MAX_VALUE;
+        me = getColor();
         while (timeAvailable[0].get()) {
             Move move = moves.get(random.nextInt(moves.size()));
             depth = 0;
@@ -66,16 +68,18 @@ public class AlphaBetaPlayer extends Player {
     }
 
     private boolean canBeWinning(Board b, Move move, Color current) {
-        Color winner = b.getWinner(current);
-        if (winner != null) {
-            return winner == getColor();
-        };
         if (depth >= maxDepth) return false;
         b.doMove(move);
-        depth++;
-        List<Move> moves = b.getMovesFor(getOpponent(current));
-        boolean foundWinning = false;
-        if (!moves.isEmpty()) foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), getOpponent(current));
+        Color opponent = getOpponent(current);
+        Color winner = b.getWinner(opponent);
+        boolean foundWinning;
+        if (winner != null) {
+            foundWinning = winner == me;
+        } else {
+            depth++;
+            List<Move> moves = b.getMovesFor(opponent);
+            foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), opponent);
+        }
         b.undoMove(move);
         return foundWinning;
     }
