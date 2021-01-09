@@ -71,7 +71,8 @@ public class AlphaBetaPlayer extends Player {
         b.doMove(move);
         depth++;
         List<Move> moves = b.getMovesFor(getOpponent(current));
-        boolean foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), getOpponent(current));
+        boolean foundWinning = false;
+        if (!moves.isEmpty()) foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), getOpponent(current));
         b.undoMove(move);
         return foundWinning;
     }
