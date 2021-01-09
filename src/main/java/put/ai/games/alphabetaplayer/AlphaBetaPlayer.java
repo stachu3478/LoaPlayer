@@ -40,6 +40,8 @@ public class AlphaBetaPlayer extends Player {
         private final Board board;
         private int totalPolls = 0;
         private final Color me;
+        private int depth;
+        private int maxDepth;
 
         public MovePoller(Board b, AtomicBoolean[] isTimeAvailable) {
             this.me = getColor();
@@ -50,10 +52,14 @@ public class AlphaBetaPlayer extends Player {
         }
 
         public Move poll() {
+            maxDepth = 0;
             while (isTimeAvailable[0].get()) {
                 for (int i = 0; i < polls.length; i++) {
                     Move move = moves.get(i);
-                    polls[i] += canBeWinning(move, me) ? 1 : -1;
+                    depth = 0;
+                    boolean winning = canBeWinning(move, me);
+                    polls[i] += winning ? 1 : -1;
+                    if (winning && depth < maxDepth) maxDepth = depth;
                     totalPolls++;
                     if (!isTimeAvailable[0].get()) break;
                 }
@@ -75,7 +81,9 @@ public class AlphaBetaPlayer extends Player {
             if (winner != null) {
                 return winner == me;
             };
+            if (depth >= maxDepth) return false;
             board.doMove(move);
+            depth++;
             List<Move> moves = board.getMovesFor(getOpponent(current));
             boolean foundWinning = false;
             if (!moves.isEmpty()) foundWinning = canBeWinning(moves.get(random.nextInt(moves.size())), getOpponent(current));
