@@ -14,6 +14,7 @@ import put.ai.games.game.Player;
 public class AlphaBetaPlayer extends Player {
     private final Random random = new Random(0xdeadbeef);
     private int depth;
+    private int maxDepth;
     private final String[] jokes = {
         "Wybierz najkrótszą ścieżkę do zwycięstwa i nią podążaj!",
         "Połączmy siły we wspólną potęgę!",
@@ -29,6 +30,7 @@ public class AlphaBetaPlayer extends Player {
         "Szczelił liścia i zrobił piękny nawrót",
         "Nie rób drugiemu co Tobie ułatwia obliczenia",
         "Do stu procesorów! Aleś ty naiwny!",
+            "Wiesz dlaczego wygrywam? Bo nie biorę porażki pod uwagę!",
     };
 
     @Override
@@ -49,15 +51,15 @@ public class AlphaBetaPlayer extends Player {
                 timeAvailable[0].set(false);
             }
         }, getTime() - 1000);
-        int shortestLength = Integer.MAX_VALUE;
+        maxDepth = Integer.MAX_VALUE;
         while (timeAvailable[0].get()) {
             Move move = moves.get(random.nextInt(moves.size()));
             depth = 0;
-            if (canBeWinning(b, move, getColor()) && shortestLength > depth) {
+            if (canBeWinning(b, move, getColor()) && maxDepth > depth) {
                 shortestToWin = move;
-                shortestLength = depth;
+                maxDepth = depth;
             }
-            if (shortestLength == 1) return move;
+            if (maxDepth == 1) return move;
         }
         System.out.println(jokes[random.nextInt(jokes.length)]);
         return shortestToWin;
@@ -65,9 +67,10 @@ public class AlphaBetaPlayer extends Player {
 
     private boolean canBeWinning(Board b, Move move, Color current) {
         Color winner = b.getWinner(current);
-            if (winner != null) {
+        if (winner != null) {
             return winner == getColor();
         };
+        if (depth >= maxDepth) return false;
         b.doMove(move);
         depth++;
         List<Move> moves = b.getMovesFor(getOpponent(current));
