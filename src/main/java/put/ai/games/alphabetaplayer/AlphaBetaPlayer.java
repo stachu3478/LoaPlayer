@@ -63,6 +63,7 @@ public class AlphaBetaPlayer extends Player {
                     totalPolls++;
                     if (!isTimeAvailable[0].get()) break;
                 }
+                if (maxDepth <= 1) break;
             }
             int bestPoll = 0;
             int bestVal = Integer.MIN_VALUE;
