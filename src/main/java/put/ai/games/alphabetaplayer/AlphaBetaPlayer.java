@@ -13,23 +13,6 @@ import put.ai.games.game.Player;
 
 public class AlphaBetaPlayer extends Player {
     private final Random random = new Random(0xdeadbeef);
-    private int depth;
-    private final String[] jokes = {
-        "Wybierz najkrótszą ścieżkę do zwycięstwa i nią podążaj!",
-        "Połączmy siły we wspólną potęgę!",
-        "Niech eksplozja rozwiązań Cię nie ogranicza!",
-        "Tylko z jednego drzewa rekurencyjnego wyrasta korzeń chwały!",
-        "Ty jesteś pionkiem, a ja jestem algorytmem!",
-        "Ja nie myślę, tylko przeszukuję szeroki wachlarz możliwości!",
-        "Nie mów \"Następny gracz\"!",
-        "Kto nie koduje, ten nie wygrywa!",
-        "Podziel się darmowym obiadem!",
-        "../../../../nie/bój/się/rekurencji\n../../../../nie/bój/się/rekurencji\n../../../../nie/bój/się/rekurencji\n../../../../nie/bój/się/rekurencji\n../../../../nie/bój/się/rekurencji\n",
-        "A ty jakiej używasz heurystyki?",
-        "Szczelił liścia i zrobił piękny nawrót",
-        "Nie rób drugiemu co Tobie ułatwia obliczenia",
-        "Do stu procesorów! Aleś ty naiwny!",
-    };
 
     @Override
     public String getName() {
@@ -39,8 +22,6 @@ public class AlphaBetaPlayer extends Player {
     @Override
     public Move nextMove(Board board) {
         Board b = board.clone();
-        List<Move> moves = b.getMovesFor(getColor());
-        Move shortestToWin = moves.get(0);
         Timer timer = new Timer();
         final AtomicBoolean[] timeAvailable = {new AtomicBoolean(true)};
         timer.schedule(new TimerTask() {
@@ -49,38 +30,57 @@ public class AlphaBetaPlayer extends Player {
                 timeAvailable[0].set(false);
             }
         }, getTime() - 1000);
-        int shortestLength = Integer.MAX_VALUE;
-        while (timeAvailable[0].get()) {
-            Move move = moves.get(random.nextInt(moves.size()));
-            depth = 0;
-            if (canBeWinning(b, move, getColor()) && shortestLength > depth) {
-                shortestToWin = move;
-                shortestLength = depth;
-            }
-            if (shortestLength == 1) return move;
+        return new MovePoller(b, timeAvailable).poll();
+    }
+
+    private class MovePoller {
+        private final int[] polls;
+        private final List<Move> moves;
+        private final AtomicBoolean[] isTimeAvailable;
+        private final Board board;
+        private int totalPolls = 0;
+        private final Color me;
+
+        public MovePoller(Board b, AtomicBoolean[] isTimeAvailable) {
+            this.me = getColor();
+            moves = b.getMovesFor(me);
+            this.polls = new int[moves.size()];
+            this.isTimeAvailable = isTimeAvailable;
+            this.board = b;
         }
-        System.out.println(jokes[random.nextInt(jokes.length)]);
-        return shortestToWin;
-    }
 
-    private boolean canBeWinning(Board b, Move move, Color current) {
-        Color winner = b.getWinner(current);
+        public Move poll() {
+            while (isTimeAvailable[0].get()) {
+                for (int i = 0; i < polls.length; i++) {
+                    Move move = moves.get(i);
+                    polls[i] += canBeWinning(move, me) ? 1 : -1;
+                    totalPolls++;
+                    if (!isTimeAvailable[0].get()) break;
+                }
+            }
+            int bestPoll = 0;
+            int bestVal = Integer.MIN_VALUE;
+            for (int i = 0; i < polls.length; i++) {
+                if (polls[i] > bestVal) {
+                    bestPoll = i;
+                    bestVal = polls[i];
+                }
+            }
+            System.out.println("Total polls: " + totalPolls);
+            return moves.get(bestPoll);
+        }
+
+        private boolean canBeWinning(Move move, Color current) {
+            Color winner = board.getWinner(current);
             if (winner != null) {
-            return winner == getColor();
-        };
-        b.doMove(move);
-        depth++;
-        List<Move> moves = b.getMovesFor(getOpponent(current));
-        boolean foundWinning = canBeWinning(b, moves.get(random.nextInt(moves.size())), getOpponent(current));
-        b.undoMove(move);
-        return foundWinning;
-    }
-
-    private class WeightedRandom {
-        private float[] weights;
-
-        public WeightedRandom(int size) {
-
+                return winner == me;
+            };
+            board.doMove(move);
+            List<Move> moves = board.getMovesFor(getOpponent(current));
+            boolean foundWinning = false;
+            if (!moves.isEmpty()) foundWinning = canBeWinning(moves.get(random.nextInt(moves.size())), getOpponent(current));
+            board.undoMove(move);
+            return foundWinning;
         }
     }
 }
