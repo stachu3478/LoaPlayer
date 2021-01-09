@@ -74,6 +74,8 @@ public class AlphaBetaPlayer extends Player {
                     for (Move move : toBeRemoved) {
                         moves.remove(move);
                     }
+                    if (moves.size() == 1) return moves.get(0);
+                    if (moves.isEmpty()) return null;
                     depth++;
                 }
             } catch (TimeoutException e) {
