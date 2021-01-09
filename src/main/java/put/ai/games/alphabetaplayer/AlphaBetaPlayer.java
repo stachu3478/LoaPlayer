@@ -77,16 +77,18 @@ public class AlphaBetaPlayer extends Player {
         }
 
         private boolean canBeWinning(Move move, Color current) {
-            Color winner = board.getWinner(current);
-            if (winner != null) {
-                return winner == me;
-            };
             if (depth >= maxDepth) return false;
             board.doMove(move);
             depth++;
-            List<Move> moves = board.getMovesFor(getOpponent(current));
-            boolean foundWinning = false;
-            if (!moves.isEmpty()) foundWinning = canBeWinning(moves.get(random.nextInt(moves.size())), getOpponent(current));
+            Color opponent = getOpponent(current);
+            Color winner = board.getWinner(opponent);
+            boolean foundWinning;
+            if (winner != null) {
+                foundWinning = winner == me;
+            } else {
+                List<Move> moves = board.getMovesFor(opponent);
+                foundWinning = canBeWinning(moves.get(random.nextInt(moves.size())), opponent);
+            }
             board.undoMove(move);
             return foundWinning;
         }
