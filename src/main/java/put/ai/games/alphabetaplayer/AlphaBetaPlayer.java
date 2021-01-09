@@ -86,14 +86,14 @@ public class AlphaBetaPlayer extends Player {
         private float run(Color color, int depth, float alpha, float beta)
         {
             if (!watchdog.call()) throw new TimeoutException();
-            List<Move> moves = board.getMovesFor(color);
             if( depth == 0 ) {
                 Color winner = board.getWinner(color);
                 if (winner != null) {
-                    return winner == color ? -1 : 1;
+                    return winner == color ? 1 : -1;
                 }
                 return 0;
             }
+            List<Move> moves = board.getMovesFor(color);
             for(Move move : moves) {
                 board.doMove(move);
                 float val = -run(getOpponent(color), depth - 1, -beta, -alpha);
