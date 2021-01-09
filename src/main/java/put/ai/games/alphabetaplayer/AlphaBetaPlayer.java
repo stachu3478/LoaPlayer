@@ -52,7 +52,7 @@ public class AlphaBetaPlayer extends Player {
         }
 
         public Move poll() {
-            maxDepth = 0;
+            maxDepth = Integer.MAX_VALUE;
             while (isTimeAvailable[0].get()) {
                 for (int i = 0; i < polls.length; i++) {
                     Move move = moves.get(i);
