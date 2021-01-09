@@ -45,6 +45,8 @@ public class AlphaBetaPlayer extends Player {
         private final Board board;
         private final Color me;
         private final Random random;
+        private int depth = 0;
+        private final Set<Long> cuttingBoards = new HashSet<>();
 
         public AlphaBeta(Board board, Color me, TimeWatchdog watchdog, Random random) {
             this.board = board.clone();
@@ -55,11 +57,12 @@ public class AlphaBetaPlayer extends Player {
 
         public Move process() {
             List<Move> moves = board.getMovesFor(me);
-            int depth = 0;
+            depth = Math.max(0, depth - 2);
             int movesRemoved = 0;
             int movesTotal = moves.size();
             try {
                 while (true) {
+                    cuttingBoards.clear();
                     List<Move> toBeRemoved = new ArrayList<>();
                     for (Move move : moves) {
                         board.doMove(move);
@@ -73,9 +76,11 @@ public class AlphaBetaPlayer extends Player {
                     }
                     for (Move move : toBeRemoved) {
                         moves.remove(move);
+                        if (moves.size() == 1) {
+                            System.out.println("No moves remaining");
+                            return moves.get(0); // no more moves to choose
+                        }
                     }
-                    if (moves.size() == 1) return moves.get(0);
-                    if (moves.isEmpty()) return null;
                     depth++;
                 }
             } catch (TimeoutException e) {
@@ -96,12 +101,17 @@ public class AlphaBetaPlayer extends Player {
                 return 0;
             }
             List<Move> moves = board.getMovesFor(color);
+            long hash = board.hashCode() + (long) color.hashCode() * Integer.MAX_VALUE;
+            if (cuttingBoards.contains(hash)) return beta;
             for(Move move : moves) {
                 board.doMove(move);
                 float val = -run(getOpponent(color), depth - 1, -beta, -alpha);
                 board.undoMove(move);
                 if( val > alpha ) alpha = val; // alpha=max(val,alpha);
-                if( alpha >= beta ) return beta; // cutoff
+                if( alpha >= beta ) {
+                    cuttingBoards.add(hash);
+                    return beta; // cutoff
+                }
             } //endfor
             return alpha;
         }
