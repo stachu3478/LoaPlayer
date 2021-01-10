@@ -34,7 +34,7 @@ public class AlphaBetaPlayer extends Player {
             }
         }, getTime() - 100);
         if (alg == null) alg = new AlphaBeta(getColor(), random);
-        alg.setWatchdog(() -> timeLow[0].get());
+        alg.setTimeLow(timeLow);
         alg.setBoard(b);
         return alg.process();
     }
@@ -46,24 +46,26 @@ public class AlphaBetaPlayer extends Player {
     public static class TimeoutException extends RuntimeException {}
 
     private static class AlphaBeta {
-        private TimeWatchdog watchdog;
+        private AtomicBoolean[] timeLow;
         private Board board;
         private final Color me;
         private final Random random;
         private int depth = 0;
-        private static final float horizonImpact = 0.0625F; // Generally horizon clash not preferred
         private final Map<Integer, Float> cuttingBoardsMe = new HashMap<>(65536);
         private final Map<Integer, Float> cuttingBoardsOp = new HashMap<>(65536);
+        private final Set<Integer> searchedBoardsMe = new HashSet<>(65536);
+        private final Set<Integer> searchedBoardsOp = new HashSet<>(65536);
         private Integer totalWins = 0;
         private Move bestMove;
+        private boolean horizon;
 
         public AlphaBeta(Color me, Random random) {
             this.me = me;
             this.random = random;
         }
 
-        public void setWatchdog(TimeWatchdog watchdog) {
-            this.watchdog = watchdog;
+        public void setTimeLow(AtomicBoolean[] timeLow) {
+            this.timeLow = timeLow;
         }
 
         public void setBoard(Board board) {
@@ -71,18 +73,23 @@ public class AlphaBetaPlayer extends Player {
         }
 
         public Move process() {
+            bestMove = null;
             List<Move> moves = board.getMovesFor(me);
             Move currentMove = moves.get(random.nextInt(moves.size()));
-            depth = Math.max(1, depth - 3);
+            depth = Math.min(Math.max(1, depth - 3), 20);
             try {
-                while (watchdog.call()) {
+                horizon = true;
+                while (timeLow[0].get() && depth < 200 && horizon) {
                     System.out.print("Depth = " + depth);
                     cuttingBoardsMe.clear();
                     cuttingBoardsOp.clear();
                     Kunter k = new Kunter();
-                    float bestResult = run(me, depth, -Float.MIN_VALUE, Float.MAX_VALUE, k);
+                    horizon = false;
+                    float bestResult = run(me, depth, -Float.MAX_VALUE, Float.MAX_VALUE, k);
                     if (bestMove == null) {
                         System.out.println("Warning: Empty best move");
+                        depth--;
+                        horizon = true;
                     } else currentMove = bestMove;
                     System.out.print(" Best val: " + bestResult);
                     System.out.print(" Total wins: " + k.getVal());
@@ -96,12 +103,18 @@ public class AlphaBetaPlayer extends Player {
 
         private float run(Color color, int depth, float alpha, float beta, Kunter totalWins)
         {
-            int hash = board.hashCode();
+            if (!timeLow[0].get()) {
+                searchedBoardsMe.clear();
+                searchedBoardsOp.clear();
+                throw new TimeoutException();
+            }
+            /*int hash = board.hashCode();
             Map<Integer, Float> cuttingBoard = getCuttingBoard(color);
-            if (cuttingBoard.containsKey(hash)) {
+            if (this.depth != depth && cuttingBoard.containsKey(hash)) {
                 return cuttingBoard.get(hash);
             }
-            if (!watchdog.call()) throw new TimeoutException();
+            Set<Integer> searchedBoard = getSearchedBoard(color);
+            if (searchedBoard.contains(hash)) return Float.MAX_VALUE; // Force nothing changing*/
             Color winner = board.getWinner(color);
             if (winner != null) {
                 int win = winner == color ? 1 : -1;
@@ -109,35 +122,43 @@ public class AlphaBetaPlayer extends Player {
                 return win * Float.MAX_VALUE;
             }
             if (depth == 0 ) {
+                horizon = true;
                 return totalWins.getVal();
             }
+            //searchedBoard.add(hash);
             List<Move> moves = board.getMovesFor(color);
             if (this.depth == depth) Collections.shuffle(moves);
             for(Move move : moves) {
                 board.doMove(move);
                 Kunter wins = new Kunter();
+                wins.change(totalWins.getVal());
                 float val = -run(getOpponent(color), depth - 1, -beta, -alpha, wins);
-                totalWins.change(wins.getVal());
+                totalWins.change(wins.getVal() - totalWins.getVal());
                 board.undoMove(move);
                 if( val > alpha ) {
                     if (this.depth == depth) this.bestMove = move;
                     alpha = val; // alpha=max(val,alpha);
                 }
                 if( alpha >= beta ) {
-                    getCuttingBoard(color).put(hash, beta);
+                    //cuttingBoard.put(hash, beta);
                     return beta; // cutoff
                 }
             } //endfor
-            getCuttingBoard(color).put(hash, alpha);
+            //searchedBoard.remove(hash);
+            //cuttingBoard.put(hash, alpha);
             return alpha;
         }
 
-        private Map<Integer, Float> getCuttingBoard(Color color) {
+        /*private Map<Integer, Float> getCuttingBoard(Color color) {
             if (color == me) return cuttingBoardsMe;
             return cuttingBoardsOp;
         }
+        private Set<Integer> getSearchedBoard(Color color) {
+            if (color == me) return searchedBoardsMe;
+            return searchedBoardsOp;
+        }*/
 
-        private class Kunter {
+        private static class Kunter {
             private int val = 0;
 
             public void change(int v) {
