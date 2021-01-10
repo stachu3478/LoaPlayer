@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import put.ai.games.Point;
 import put.ai.games.game.Board;
 import put.ai.games.game.Move;
 import put.ai.games.game.Player;
@@ -50,6 +51,8 @@ public class AlphaBetaPlayer extends Player {
                 usePoll = false;
             }
         //}
+        int estimatedMovesToWin = new Labeller(b, getColor()).run();
+            System.out.println("Estimated moves to win: " + estimatedMovesToWin);
 
         if (move == null) {
             System.out.println("Warning: Empty move");
@@ -245,6 +248,161 @@ public class AlphaBetaPlayer extends Player {
             }
             board.undoMove(move);
             return foundWinning;
+        }
+    }
+
+    private static class Labeller {
+        private final Board board;
+        private final Color color;
+        private int[][] labelMap;
+        private final List<Label> labels;
+
+        public Labeller(Board board, Color color) {
+            labels = new ArrayList<>();
+            this.board = board;
+            this.color = color;
+        }
+
+        public int run() {
+            labels.clear();
+            labelMap = new int[board.getSize()][board.getSize()];
+            for (int x = 0; x < board.getSize(); x++) {
+                for (int y = 0; y < board.getSize(); y++) {
+                    checkAndPutLabel(null, x, y);
+                }
+            }
+
+            List<Label> finalLabels = new ArrayList<>();
+            for (Label label1 : labels) {
+                int minDistance = Integer.MAX_VALUE;
+                for (Label label2 : labels) {
+                    if (label1.equals(label2)) continue;
+                    minDistance = Math.min(minDistance, label1.getDistance(label2));
+                    if (minDistance <= 2) break;
+                }
+                if (minDistance <= Math.max(label1.getSize(), 2)) finalLabels.add(label1);
+            }
+            int sum = 0;
+            int maxSize = 1;
+            for (Label label : labels) {
+                sum += label.getSize();
+                maxSize = Math.max(maxSize, label.getSize());
+            }
+            if (finalLabels.size() <= 1) {
+                System.out.println("Outer calc");
+                return sum - maxSize;
+            }
+            System.out.println("Span calc");
+            return Math.min(span(finalLabels), sum - maxSize);
+        }
+
+        private int span(List<Label> labels) {
+            int[][] labelGraph = new int[labels.size()][labels.size()];
+            boolean[] connected = new boolean[labels.size()];
+            int toBeConnected = labels.size() - 1;
+            int spanSize = 0;
+            for (int l1 = 0; l1 < labels.size(); l1++) {
+                for (int l2 = 0; l2 < labels.size(); l2++) {
+                    if (labels.get(l1).equals(labels.get(l2))) labelGraph[l1][l2] = Integer.MAX_VALUE;
+                    else labelGraph[l1][l2] = labels.get(l1).getDistance(labels.get(l2)) - 1;
+                }
+            }
+            while (toBeConnected > 0) {
+                for (int x = 0; x < labels.size(); x++) {
+                    if (connected[x]) continue;
+                    int minDist = Integer.MAX_VALUE;
+                    int minY = 0;
+                    for (int y = 0; y < labels.size(); y++) {
+                        if (connected[y]) continue;
+                        if (labelGraph[x][y] < minDist) {
+                            minDist = labelGraph[x][y];
+                            minY = y;
+                            if (minDist <= 1) {
+                                minDist = 0;
+                                break;
+                            };
+                        }
+                    }
+                    connected[minY] = true;
+                    spanSize += minDist;
+                    toBeConnected--;
+                    for (int y = 0; y < labels.size(); y++) {
+                        labelGraph[x][y] = Math.min(labelGraph[x][y], labelGraph[minY][y]);
+                    }
+                }
+            }
+            return spanSize;
+        }
+
+        private void putRecursiveLabel(Label label, int x, int y) {
+            checkAndPutLabel(label, x - 1, y);
+            checkAndPutLabel(label, x + 1, y);
+            checkAndPutLabel(label, x, y - 1);
+            checkAndPutLabel(label, x, y + 1);
+            checkAndPutLabel(label, x - 1, y - 1);
+            checkAndPutLabel(label, x - 1, y + 1);
+            checkAndPutLabel(label, x + 1, y - 1);
+            checkAndPutLabel(label, x + 1, y + 1);
+        }
+
+        private void checkAndPutLabel(Label label, int x, int y) {
+            if (board.getState(x, y) == color && labelMap[x][y] == 0) {
+                if (label == null) {
+                    label = new Label(labels.size());
+                    labels.add(label);
+                }
+                labelMap[x][y] = 1;
+                label.addPoint(new put.ai.games.Point(x, y));
+                putRecursiveLabel(label, x, y);
+            }
+        }
+
+        private static class Label {
+            private final int id;
+            private final List<put.ai.games.Point> points = new ArrayList<>();
+
+            public Label(int id) {
+                this.id = id;
+            }
+
+            public void addPoint(put.ai.games.Point p) {
+                points.add(p);
+            }
+
+            public int getId() {
+                return id;
+            }
+
+            public int getSize() {
+                return points.size();
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+                Label label = (Label) o;
+                return id == label.id;
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(id);
+            }
+
+            public int getDistance(Label l) {
+                int near = Integer.MAX_VALUE;
+                for (put.ai.games.Point myPoint : points) {
+                    for (Point point : l.points) {
+                        int distance = Math.max(Math.abs(myPoint.getX() - point.getX()), Math.abs(myPoint.getY() - point.getY()));
+                        if (distance < near) {
+                            if (distance <= 2) return distance;
+                            near = distance;
+                        }
+                    }
+                }
+                return near;
+            }
         }
     }
 }
