@@ -59,11 +59,13 @@ public class AlphaBetaPlayer extends Player {
                     depth = 0;
                     int winningWeight = canBeWinning(move, me);
                     polls[i] += winningWeight;
-                    if (winningWeight > 0 && depth < maxDepth) maxDepth = depth;
+                    if (winningWeight > 0 && depth < maxDepth) {
+                        maxDepth = depth;
+                        if (maxDepth <= 1) return move;
+                    }
                     totalPolls++;
                     if (!isTimeAvailable[0].get()) break;
                 }
-                if (maxDepth <= 1) break;
             }
             int bestPoll = 0;
             int bestVal = Integer.MIN_VALUE;
