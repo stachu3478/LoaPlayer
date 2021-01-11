@@ -42,12 +42,14 @@ public class AlphaBetaPlayer extends Player {
         private final Board board;
         private int totalPolls = 0;
         private final Color me;
+        private final Color op;
         private int depth;
         private int maxDepth;
         private final BoardIndexer indexer;
 
         public MovePoller(Board b, AtomicBoolean[] isTimeAvailable) {
             this.me = getColor();
+            this.op = getOpponent(me);
             moves = b.getMovesFor(me);
             this.polls = new int[moves.size()];
             this.isTimeAvailable = isTimeAvailable;
@@ -57,17 +59,17 @@ public class AlphaBetaPlayer extends Player {
 
         public Move poll() {
             maxDepth = Integer.MAX_VALUE;
+            indexer.makeBoardSnapshot(board);
             while (isTimeAvailable[0].get()) {
                 for (int i = 0; i < polls.length; i++) {
                     Move move = moves.get(i);
                     depth = 0;
-                    indexer.makeBoardSnapshot(board);
                     int winningWeight = canBeWinning((LinesOfActionMove) move, me);
                     polls[i] += winningWeight;
                     if (winningWeight > 0 && depth < maxDepth) {
                         maxDepth = depth;
-                        if (maxDepth <= 1) return move;
                     }
+                    if (winningWeight > 0 && depth <= 1) return move;
                     totalPolls++;
                     if (!isTimeAvailable[0].get()) break;
                 }
@@ -90,7 +92,7 @@ public class AlphaBetaPlayer extends Player {
             indexer.doMove(move);
             depth++;
             Color opponent = getOpponent(current);
-            Color winner = board.getWinner(opponent);
+            Color winner = indexer.getWinner(me, op);
             int foundWinning = 0;
             if (winner != null) {
                 foundWinning = winner == me ? 1 : -100;
@@ -136,9 +138,9 @@ public class AlphaBetaPlayer extends Player {
                 for (int x = 0; x < boardSize; x++) {
                     for (int y = 0; y < boardSize; y++) {
                         Color color = b.getState(x, y);
-                        MooPoint point = new MooPoint(x, y);
-                        boardSnaphot[x][y] = point;
                         if (color != Color.EMPTY) {
+                            MooPoint point = new MooPoint(x, y);
+                            boardSnaphot[x][y] = point;
                             if (color == me) {
                                 myPieces.add(point);
                             } else {
@@ -166,34 +168,39 @@ public class AlphaBetaPlayer extends Player {
                     } else {
                         opPieces.remove(targetPiece);
                     }
+                } else {
+                    changeMixes(dx, dy, 1);
                 }
                 boardSnaphot[sx][sy] = null;
                 boardSnaphot[dx][dy] = piece;
                 board.doMove(move);
                 changeMixes(sx, sy, -1);
-                changeMixes(dx, dy, -1);
             }
 
             public void undoMove(LinesOfActionMove move) {
-                int dx = move.getSrcX();
-                int dy = move.getSrcY();
-                int sx = move.getDstX();
-                int sy = move.getDstY();
-                MooPoint piece = boardSnaphot[sx][sy];
-                piece.setX(dx);
-                piece.setY(dy);
-                boardSnaphot[dx][dy] = piece;
+                int sx = move.getSrcX();
+                int sy = move.getSrcY();
+                int dx = move.getDstX();
+                int dy = move.getDstY();
+                MooPoint piece = boardSnaphot[dx][dy];
+                piece.setX(sx);
+                piece.setY(sy);
+                boardSnaphot[sx][sy] = piece;
                 board.undoMove(move);
-                Color color = board.getState(sx, sy);
-                if (color != null) {
-                    MooPoint point = new MooPoint(sx, sy);
-                    boardSnaphot[sx][sy] = point;
+                Color color = board.getState(dx, dy);
+                if (color != Color.EMPTY) {
+                    MooPoint point = new MooPoint(dx, dy);
+                    boardSnaphot[dx][dy] = point;
                     if (color == me) {
                         myPieces.add(point);
                     } else {
                         opPieces.add(point);
                     }
-                } else boardSnaphot[sx][sy] = null;
+                } else {
+                    changeMixes(dx, dy, -1);
+                    boardSnaphot[dx][dy] = null;
+                }
+                changeMixes(sx, sy, 1);
             }
 
             private void changeMixes(int x, int y, int val) {
@@ -201,6 +208,38 @@ public class AlphaBetaPlayer extends Player {
                 mixCols[x] += val;
                 mixLurdWedges[boardSize + x - y] += val;
                 mixLdruWedges[x + y] += val;
+            }
+
+            public Color getWinner(Color me, Color op) {
+                if (winning(myPieces)) return me;
+                if (winning(opPieces)) return op;
+                return null;
+            }
+
+            private boolean winning(List<MooPoint> pieces) {
+                int connectedCountdown = pieces.size() - 1;
+                if (connectedCountdown <= 0) return true;
+                Set<MooPoint> closed = new HashSet<>();
+                closed.add(pieces.get(0));
+                List<MooPoint> connectedPieces = new ArrayList<>();
+                connectedPieces.add(pieces.get(0));
+                while (!connectedPieces.isEmpty()) {
+                    List<MooPoint> newPieces = new ArrayList<>();
+                    for (MooPoint p1 : connectedPieces) {
+                        for (MooPoint p2 : pieces) {
+                            if (p1 == p2) continue;
+                            if (closed.contains(p2)) continue;
+                            if (Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY() - p2.getY())) == 1) {
+                                newPieces.add(p2);
+                                closed.add(p2);
+                                connectedCountdown--;
+                                if (connectedCountdown == 0) return true;
+                            }
+                        }
+                    }
+                    connectedPieces = newPieces;
+                }
+                return false;
             }
 
             public LinesOfActionMove getRandomMove(Color color, Color blocker) {
