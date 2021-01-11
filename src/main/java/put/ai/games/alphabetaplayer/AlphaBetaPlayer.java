@@ -48,6 +48,8 @@ public class AlphaBetaPlayer extends Player {
         private MovePoller poller;
         private Move bestMove;
         private int depth;
+        private Set<Board> dopedMyBoards = new HashSet<>();
+        private Set<Board> dopedOpBoards = new HashSet<>();
 
         public AlphaBeta(Board board, Color me, TimeWatchdog watchdog, Random random) {
             this.board = board.clone();
@@ -83,9 +85,16 @@ public class AlphaBetaPlayer extends Player {
 
         private float run(Color color, int depth, float alpha, float beta)
         {
-            if (!watchdog.call()) throw new TimeoutException();
+            if (!watchdog.call()) {
+                dopedOpBoards.clear();
+                dopedMyBoards.clear();
+                throw new TimeoutException();
+            }
+            Set<Board> dopedBoards = getDopedBoards(color);
+            if (!dopedBoards.add(board)) return alpha;
             Color winner = board.getWinner(color);
             if (winner != null) {
+                dopedBoards.remove(board);
                 return winner == color ? Float.MAX_VALUE : -Float.MAX_VALUE;
             }
             List<Move> moves = board.getMovesFor(color);
@@ -94,6 +103,7 @@ public class AlphaBetaPlayer extends Player {
                 for (int i = 0; i < 1 && watchdog.call(); i++) {
                     poll += poller.poll(moves, board);
                 }
+                dopedBoards.remove(board);
                 return color == me ? poll : -poll;
             }
             for(Move move : moves) {
@@ -104,9 +114,18 @@ public class AlphaBetaPlayer extends Player {
                     if (this.depth == depth) bestMove = move;
                     alpha = val; // alpha=max(val,alpha);
                 }
-                if( alpha >= beta ) return beta; // cutoff
+                if( alpha >= beta ) {
+                    dopedBoards.remove(board);
+                    return beta; // cutoff
+                }
             } //endfor
+            dopedBoards.remove(board);
             return alpha;
+        }
+
+        private Set<Board> getDopedBoards(Color color) {
+            if (color == me) return dopedMyBoards;
+            return dopedOpBoards;
         }
 
         private class MovePoller {
