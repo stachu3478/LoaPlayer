@@ -85,12 +85,12 @@ public class AlphaBetaPlayer extends Player {
             depth++;
             Color opponent = getOpponent(current);
             Color winner = board.getWinner(opponent);
-            int foundWinning;
+            int foundWinning = 0;
             if (winner != null) {
                 foundWinning = winner == me ? 1 : -100;
             } else {
                 List<Move> moves = board.getMovesFor(opponent);
-                foundWinning = canBeWinning(moves.get(random.nextInt(moves.size())), opponent);
+                if (!moves.isEmpty()) foundWinning = canBeWinning(moves.get(random.nextInt(moves.size())), opponent);
             }
             board.undoMove(move);
             return foundWinning;
