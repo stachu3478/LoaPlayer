@@ -50,7 +50,6 @@ public class AlphaBetaPlayer extends Player {
         private final Board board;
         private final Color me;
         private final Random random;
-        private MovePoller poller;
         private Move bestMove;
         private int depth;
         private Set<Board> dopedMyBoards = new HashSet<>();
@@ -62,7 +61,6 @@ public class AlphaBetaPlayer extends Player {
             this.watchdog = watchdog;
             this.me = me;
             this.random = random;
-            this.poller = new MovePoller(me);
             this.depth = 1;
             this.indexer = new BoardIndexer();
         }
@@ -70,7 +68,6 @@ public class AlphaBetaPlayer extends Player {
         public Move process() {
             depth = Math.max(1, depth - 3);
             Move bestDepthMove = null;
-            this.poller.setMaxDepth(Integer.MAX_VALUE);
             try {
                 while (watchdog.call()) {
                     bestMove = null;
@@ -99,17 +96,13 @@ public class AlphaBetaPlayer extends Player {
             }
             Set<Board> dopedBoards = getDopedBoards(color);
             if (!dopedBoards.add(board)) return alpha;
-            Color winner = board.getWinner(color);
+            Color winner = indexer.getWinner(color, getOpponent(color));
             if (winner != null) {
                 dopedBoards.remove(board);
                 return winner == color ? Float.MAX_VALUE : -Float.MAX_VALUE;
             }
-            List<Move> moves = board.getMovesFor(color);
+            List<Move> moves = indexer.getMovesFor(color, getOpponent(color));
             if( depth == 0 ) {
-                //float poll = 0;
-                //for (int i = 0; i < 1 && watchdog.call(); i++) {
-                //    poll += poller.poll(moves, board);
-                //}
                 dopedBoards.remove(board);
                 return indexer.heuri(color); //color == me ? poll : -poll;
             }
@@ -133,49 +126,6 @@ public class AlphaBetaPlayer extends Player {
         private Set<Board> getDopedBoards(Color color) {
             if (color == me) return dopedMyBoards;
             return dopedOpBoards;
-        }
-
-        private class MovePoller {
-            private Board board;
-            private final Color me;
-            private int depth;
-            private int maxDepth;
-
-            public MovePoller(Color c) {
-                this.me = c;
-            }
-
-            public void setMaxDepth(int maxDepth) {
-                this.maxDepth = maxDepth;
-            }
-
-            public float poll(List<Move> moves, Board b) {
-                this.board = b;
-                maxDepth = Integer.MAX_VALUE;
-                depth = 0;
-                float winningWeight = canBeWinning((LinesOfActionMove) moves.get(random.nextInt(moves.size())), me);
-                if (winningWeight > 0 && depth < maxDepth) {
-                    maxDepth = depth;
-                }
-                return winningWeight / depth;
-            }
-
-            private int canBeWinning(LinesOfActionMove move, Color current) {
-                if (depth >= maxDepth) return 0;
-                indexer.doMove(move);
-                depth++;
-                Color opponent = getOpponent(current);
-                Color winner = board.getWinner(opponent);
-                int foundWinning = 0;
-                if (winner != null) {
-                    foundWinning = winner == me ? 1 : -100;
-                } else {
-                    LinesOfActionMove newMove = indexer.getRandomMove(opponent, current);
-                    if (newMove != null) foundWinning = canBeWinning(newMove, opponent);
-                }
-                indexer.undoMove(move);
-                return foundWinning;
-            }
         }
 
         private class BoardIndexer { // move search booster
@@ -332,10 +282,11 @@ public class AlphaBetaPlayer extends Player {
                 return false;
             }
 
-            public LinesOfActionMove getRandomMove(Color color, Color blocker) {
+            public List<Move> getMovesFor(Color color, Color blocker) {
+                List<Move> moves = new ArrayList<>();
                 List<MooPoint> pieces = color == me ? myPieces : opPieces;
                 int maxRand = pieces.size() * 8;
-                int rand = random.nextInt(maxRand);
+                int rand = 0;
                 for (int i = 0; i < maxRand; i++) {
                     rand = (rand + 1) % maxRand;
                     MooPoint piece = pieces.get(rand / 8);
@@ -394,10 +345,9 @@ public class AlphaBetaPlayer extends Player {
                         }
                     }
                     if (!canMove) continue;
-                    return new LinesOfActionMove(color, x, y, dx, dy);
+                    moves.add(new LinesOfActionMove(color, x, y, dx, dy));
                 }
-                System.out.println("Warning: No move found");
-                return null;
+                return moves;
             }
 
             private class MooPoint {
