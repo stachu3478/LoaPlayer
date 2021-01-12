@@ -16,8 +16,6 @@ import put.ai.games.linesofaction.LinesOfActionMove;
 
 public class AlphaBetaPlayer extends Player {
     private final Random random = new Random(0xdeadbeef);
-    private Color me;
-    private Board board;
 
     @Override
     public String getName() {
@@ -26,8 +24,6 @@ public class AlphaBetaPlayer extends Player {
 
     @Override
     public Move nextMove(Board b) {
-        me = getColor();
-        board = b.clone();
         Timer timer = new Timer();
         final AtomicBoolean[] timeLow = {new AtomicBoolean(true)};
         timer.schedule(new TimerTask() {
@@ -50,12 +46,12 @@ public class AlphaBetaPlayer extends Player {
         private final Board board;
         private final Color me;
         private final Random random;
-        private MovePoller poller;
+        private final MovePoller poller;
         private Move bestMove;
         private int depth;
-        private Set<Board> dopedMyBoards = new HashSet<>();
-        private Set<Board> dopedOpBoards = new HashSet<>();
-        private BoardIndexer indexer;
+        private final Set<Board> dopedMyBoards = new HashSet<>();
+        private final Set<Board> dopedOpBoards = new HashSet<>();
+        private final BoardIndexer indexer;
 
         public AlphaBeta(Board board, Color me, TimeWatchdog watchdog, Random random) {
             this.board = board.clone();
@@ -99,19 +95,19 @@ public class AlphaBetaPlayer extends Player {
             }
             Set<Board> dopedBoards = getDopedBoards(color);
             if (!dopedBoards.add(board)) return alpha;
-            Color winner = board.getWinner(color);
+            Color winner = indexer.getWinner(color, getOpponent(color));
             if (winner != null) {
                 dopedBoards.remove(board);
                 return winner == color ? Float.MAX_VALUE : -Float.MAX_VALUE;
             }
             List<Move> moves = board.getMovesFor(color);
             if( depth == 0 ) {
-                //float poll = 0;
-                //for (int i = 0; i < 1 && watchdog.call(); i++) {
-                //    poll += poller.poll(moves, board);
-                //}
+                float poll = 0;
+                for (int i = 0; i < 1 && watchdog.call(); i++) {
+                    poll += poller.poll(moves, board);
+                }
                 dopedBoards.remove(board);
-                return indexer.heuri(color); //color == me ? poll : -poll;
+                return color == me ? poll : -poll;
             }
             for(Move move : moves) {
                 indexer.doMove((LinesOfActionMove) move);
@@ -198,22 +194,6 @@ public class AlphaBetaPlayer extends Player {
                 myPieces = new ArrayList<>();
                 opPieces = new ArrayList<>();
                 makeBoardSnapshot(board);
-            }
-
-            public int heuri(Color c) {
-                if (c == me) return distanceSum(opPieces) - distanceSum(myPieces);
-                return distanceSum(myPieces) - distanceSum(opPieces);
-            }
-
-            private int distanceSum(List<MooPoint> pieces) {
-                int d = 0;
-                for (MooPoint p1 : pieces) {
-                    for (MooPoint p2 : pieces) {
-                        if (p1 == p2) continue;
-                        d += Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY()) - p2.getY());
-                    }
-                }
-                return d;
             }
 
             private void makeBoardSnapshot(Board b) {
