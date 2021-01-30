@@ -4,7 +4,6 @@
  */
 package put.ai.games.alphabetaplayer;
 
-import java.awt.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
