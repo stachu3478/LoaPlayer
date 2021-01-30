@@ -11,13 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import put.ai.games.game.Board;
 import put.ai.games.game.Move;
 import put.ai.games.game.Player;
-import put.ai.games.linesofaction.LinesOfActionMove;
 
 public class AlphaBetaPlayer extends Player {
-    private final Random random = new Random(0xdeadbeef);
-    private Color me;
-    private Board board;
-
     @Override
     public String getName() {
         return "Stanisław Graczyk 146889 Wojciech Kamiński 141242";
@@ -25,356 +20,119 @@ public class AlphaBetaPlayer extends Player {
 
     @Override
     public Move nextMove(Board b) {
-        me = getColor();
-        board = b.clone();
         Timer timer = new Timer();
-        final AtomicBoolean[] timeLow = {new AtomicBoolean(true)};
+        final AtomicBoolean[] timeAvail = {new AtomicBoolean(true)};
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                timeLow[0].set(false);
+                timeAvail[0].set(false);
             }
         }, getTime() - 100);
-        return new AlphaBeta(b, getColor(), () -> timeLow[0].get(), random).process();
-    }
-
-    public interface TimeWatchdog {
-        boolean call();
-    }
-
-    public static class TimeoutException extends RuntimeException {}
-
-    private static class AlphaBeta {
-        private final TimeWatchdog watchdog;
-        private final Board board;
-        private final Color me;
-        private final Random random;
-        private Move bestMove;
-        private int depth;
-        private Set<Board> dopedMyBoards = new HashSet<>();
-        private Set<Board> dopedOpBoards = new HashSet<>();
-        private BoardIndexer indexer;
-
-        public AlphaBeta(Board board, Color me, TimeWatchdog watchdog, Random random) {
-            this.board = board.clone();
-            this.watchdog = watchdog;
-            this.me = me;
-            this.random = random;
-            this.depth = 1;
-            this.indexer = new BoardIndexer();
-        }
-
-        public Move process() {
-            depth = Math.max(1, depth - 3);
-            Move bestDepthMove = null;
+        A a = new A(b, (_b, _c) -> 0 /* TODO: add heuristic */);
+        while (timeAvail[0].get()) {
             try {
-                while (watchdog.call()) {
-                    bestMove = null;
-                    float bestVal = run(me, depth, -Float.MAX_VALUE, Float.MAX_VALUE);
-                    System.out.println("Best val: " + bestVal);
-                    if (bestMove != null) bestDepthMove = bestMove;
-                    if (bestVal == Float.MAX_VALUE) return bestDepthMove;
-                    depth++;
-                }
-            } catch (TimeoutException e) {
-                System.out.println("Depth reached " + depth);
-            }
-            if (bestDepthMove == null) {
-                List<Move> moves = board.getMovesFor(me);
-                return moves.get(random.nextInt(moves.size()));
-            }
-            return bestDepthMove;
-        }
-
-        private float run(Color color, int depth, float alpha, float beta)
-        {
-            if (!watchdog.call()) {
-                dopedOpBoards.clear();
-                dopedMyBoards.clear();
-                throw new TimeoutException();
-            }
-            Set<Board> dopedBoards = getDopedBoards(color);
-            if (!dopedBoards.add(board)) return alpha;
-            Color winner = indexer.getWinner(color, getOpponent(color));
-            if (winner != null) {
-                dopedBoards.remove(board);
-                return winner == color ? Float.MAX_VALUE : -Float.MAX_VALUE;
-            }
-            List<Move> moves = indexer.getMovesFor(color, getOpponent(color));
-            if( depth == 0 ) {
-                dopedBoards.remove(board);
-                return indexer.heuri(color); //color == me ? poll : -poll;
-            }
-            for(Move move : moves) {
-                indexer.doMove((LinesOfActionMove) move);
-                float val = -run(getOpponent(color), depth - 1, -beta, -alpha);
-                indexer.undoMove((LinesOfActionMove) move);
-                if( val > alpha ) {
-                    if (this.depth == depth) bestMove = move;
-                    alpha = val; // alpha=max(val,alpha);
-                }
-                if( alpha >= beta ) {
-                    dopedBoards.remove(board);
-                    return beta; // cutoff
-                }
-            } //endfor
-            dopedBoards.remove(board);
-            return alpha;
-        }
-
-        private Set<Board> getDopedBoards(Color color) {
-            if (color == me) return dopedMyBoards;
-            return dopedOpBoards;
-        }
-
-        private class BoardIndexer { // move search booster
-            private final int[] mixRows;
-            private final int[] mixCols;
-            private final int[] mixLurdWedges;
-            private final int[] mixLdruWedges;
-            private final int boardSize;
-            private final MooPoint[][] boardSnaphot;
-            private final List<MooPoint> myPieces;
-            private final List<MooPoint> opPieces;
-
-            public BoardIndexer() {
-                boardSize = board.getSize();
-                mixRows = new int[boardSize];
-                mixCols = new int[boardSize];
-                mixLurdWedges = new int[boardSize * 2];
-                mixLdruWedges = new int[boardSize * 2];
-                boardSnaphot = new MooPoint[boardSize][boardSize];
-                myPieces = new ArrayList<>();
-                opPieces = new ArrayList<>();
-                makeBoardSnapshot(board);
-            }
-
-            public int heuri(Color c) {
-                if (c == me) return distanceSum(opPieces) - distanceSum(myPieces);
-                return distanceSum(myPieces) - distanceSum(opPieces);
-            }
-
-            private int distanceSum(List<MooPoint> pieces) {
-                int d = 0;
-                for (MooPoint p1 : pieces) {
-                    for (MooPoint p2 : pieces) {
-                        if (p1 == p2) continue;
-                        d += Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY()) - p2.getY());
-                    }
-                }
-                return d;
-            }
-
-            private void makeBoardSnapshot(Board b) {
-                myPieces.clear();
-                opPieces.clear();
-                for (int x = 0; x < boardSize; x++) {
-                    mixRows[x] = 0;
-                    mixCols[x] = 0;
-                    mixLurdWedges[x] = 0;
-                    mixLdruWedges[x] = 0;
-                }
-                for (int x = 0; x < boardSize; x++) {
-                    for (int y = 0; y < boardSize; y++) {
-                        Color color = b.getState(x, y);
-                        if (color != Color.EMPTY) {
-                            MooPoint point = new MooPoint(x, y);
-                            boardSnaphot[x][y] = point;
-                            if (color == me) {
-                                myPieces.add(point);
-                            } else {
-                                opPieces.add(point);
-                            }
-                            changeMixes(x, y, 1);
-                        }
-                    }
-                }
-            }
-
-            public void doMove(LinesOfActionMove move) {
-                int sx = move.getSrcX();
-                int sy = move.getSrcY();
-                int dx = move.getDstX();
-                int dy = move.getDstY();
-                MooPoint piece = boardSnaphot[sx][sy];
-                piece.setX(dx);
-                piece.setY(dy);
-                MooPoint targetPiece = boardSnaphot[dx][dy];
-                Color color = board.getState(dx, dy);
-                if (targetPiece != null) {
-                    if (color == me) {
-                        myPieces.remove(targetPiece);
-                    } else {
-                        opPieces.remove(targetPiece);
-                    }
-                } else {
-                    changeMixes(dx, dy, 1);
-                }
-                boardSnaphot[sx][sy] = null;
-                boardSnaphot[dx][dy] = piece;
-                board.doMove(move);
-                changeMixes(sx, sy, -1);
-            }
-
-            public void undoMove(LinesOfActionMove move) {
-                int sx = move.getSrcX();
-                int sy = move.getSrcY();
-                int dx = move.getDstX();
-                int dy = move.getDstY();
-                MooPoint piece = boardSnaphot[dx][dy];
-                piece.setX(sx);
-                piece.setY(sy);
-                boardSnaphot[sx][sy] = piece;
-                board.undoMove(move);
-                Color color = board.getState(dx, dy);
-                if (color != Color.EMPTY) {
-                    MooPoint point = new MooPoint(dx, dy);
-                    boardSnaphot[dx][dy] = point;
-                    if (color == me) {
-                        myPieces.add(point);
-                    } else {
-                        opPieces.add(point);
-                    }
-                } else {
-                    changeMixes(dx, dy, -1);
-                    boardSnaphot[dx][dy] = null;
-                }
-                changeMixes(sx, sy, 1);
-            }
-
-            private void changeMixes(int x, int y, int val) {
-                mixRows[y] += val;
-                mixCols[x] += val;
-                mixLurdWedges[boardSize + x - y] += val;
-                mixLdruWedges[x + y] += val;
-            }
-
-            public Color getWinner(Color me, Color op) {
-                if (winning(myPieces)) return me;
-                if (winning(opPieces)) return op;
-                return null;
-            }
-
-            private boolean winning(List<MooPoint> pieces) {
-                int connectedCountdown = pieces.size() - 1;
-                if (connectedCountdown <= 0) return true;
-                Set<MooPoint> closed = new HashSet<>();
-                closed.add(pieces.get(0));
-                List<MooPoint> connectedPieces = new ArrayList<>();
-                connectedPieces.add(pieces.get(0));
-                while (!connectedPieces.isEmpty()) {
-                    List<MooPoint> newPieces = new ArrayList<>();
-                    for (MooPoint p1 : connectedPieces) {
-                        for (MooPoint p2 : pieces) {
-                            if (p1 == p2) continue;
-                            if (closed.contains(p2)) continue;
-                            if (Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY() - p2.getY())) == 1) {
-                                newPieces.add(p2);
-                                closed.add(p2);
-                                connectedCountdown--;
-                                if (connectedCountdown == 0) return true;
-                            }
-                        }
-                    }
-                    connectedPieces = newPieces;
-                }
-                return false;
-            }
-
-            public List<Move> getMovesFor(Color color, Color blocker) {
-                List<Move> moves = new ArrayList<>();
-                List<MooPoint> pieces = color == me ? myPieces : opPieces;
-                int maxRand = pieces.size() * 8;
-                int rand = 0;
-                for (int i = 0; i < maxRand; i++) {
-                    rand = (rand + 1) % maxRand;
-                    MooPoint piece = pieces.get(rand / 8);
-                    int x = piece.getX();
-                    int y = piece.getY();
-                    if (boardSnaphot[x][y] != piece) {
-                        System.out.print("?");
-                        continue;
-                    }
-                    if (board.getState(x, y) != color) {
-                        System.out.print("!");
-                        continue;
-                    }
-                    int rest = rand % 8;
-                    int xDir = -1;
-                    int yDir = -1;
-                    int distance = mixLdruWedges[x + y];
-                    if (rest == 0) {
-                        xDir = 0;
-                    } else if (rest == 1) {
-                        xDir = 1;
-                    } else if (rest == 2) {
-                        xDir = 1;
-                        yDir = 0;
-                    } else if (rest == 3) {
-                        xDir = 1;
-                        yDir = 1;
-                    } else if (rest == 4) {
-                        xDir = 0;
-                        yDir = 1;
-                    } else if (rest == 5) {
-                        yDir = 1;
-                    } else if (rest == 6) {
-                        yDir = 0;
-                    }
-
-                    if (xDir == 0) {
-                        distance = mixCols[x];
-                    } else if (yDir == 0) {
-                        distance = mixRows[y];
-                    } else if (xDir != yDir) {
-                        distance = mixLurdWedges[boardSize + x - y];
-                    }
-
-                    int dx = x + distance * xDir;
-                    int dy = y + distance * yDir;
-                    if (dx < 0 || dy < 0 || dx >= boardSize || dy >= boardSize) continue;
-                    Color state = board.getState(x + distance * xDir, y + distance * yDir);
-                    if (state == color) continue; // cannot remove himself
-                    boolean canMove = true;
-                    for (int j = 1; j < distance; j++) { // enemy piece blocks
-                        state = board.getState(x + j * xDir, y + j * yDir);
-                        if (state == blocker)  {
-                            canMove = false;
-                            break;
-                        }
-                    }
-                    if (!canMove) continue;
-                    moves.add(new LinesOfActionMove(color, x, y, dx, dy));
-                }
-                return moves;
-            }
-
-            private class MooPoint {
-                private int x;
-                private int y;
-
-                public MooPoint(int x, int y) {
-                    this.x = x;
-                    this.y = y;
-                }
-
-                public void setX(int x) {
-                    this.x = x;
-                }
-
-                public int getX() {
-                    return x;
-                }
-
-                public void setY(int y) {
-                    this.y = y;
-                }
-
-                public int getY() {
-                    return y;
-                }
+                a.step();
+            } catch (A.ExhaustedException e) {
+                break;
             }
         }
+        return a.findBestMove();
     }
 
+    private class A {
+        private final int distanceBetweenNodes;
+        private final TreeMap<Integer, List<Node>> orderedNodes = new TreeMap<>();
+        private final HashMap<Board, Move> leaders = new HashMap<>();
+        private final Heuristic heuristic;
+
+        public A(Board b, Heuristic heuristic) {
+            this.heuristic = heuristic;
+            this.distanceBetweenNodes = b.getSize() / 2;
+            addNode(b);
+        }
+
+        public void step() throws ExhaustedException {
+            Node toBeExpanded = null;
+            for (List<Node> bestNodes : orderedNodes.values()) { // find leaf that is expandable
+                for (Node node : bestNodes) {
+                    if (!node.leaf && !node.expanded) {
+                        toBeExpanded = node;
+                        break;
+                    }
+                }
+            }
+            if (toBeExpanded == null) throw new ExhaustedException(); // the tree is fully expanded
+            else expandNode(toBeExpanded);
+        }
+
+        public Move findBestMove() {
+            for (List<Node> bestNodes : orderedNodes.values()) {
+                for (Node node : bestNodes) {
+                    if (node.lastMoverColor == getColor() && leaders.containsKey(node.board)) return leaders.get(node.board);
+                }
+            }
+            return null;
+        }
+
+        private void addNode(Board b) {
+            addNode(b.clone(), getOpponent(getColor()), 0);
+        }
+
+        private void addNode(Board b, Color moverColor, int depth) {
+            Color winner = b.getWinner(null);
+            int measurement;
+            boolean leaf = true;
+            int distanceToNode = depth * distanceBetweenNodes;
+            if (winner == moverColor) measurement = Integer.MAX_VALUE - distanceToNode;
+            else if (winner == getOpponent(moverColor)) measurement = Integer.MIN_VALUE + distanceToNode;
+            else {
+                leaf = false;
+                measurement = heuristic.measure(b, moverColor) + distanceToNode;
+            }
+            measurement = getColor() == moverColor ? measurement : -measurement;
+            insertNode(new Node(b.clone(), moverColor, depth, leaf), measurement);
+        }
+
+        private void insertNode(Node node, int key) {
+            List<Node> nodes = orderedNodes.computeIfAbsent(key, k -> new ArrayList<>());
+            nodes.add(node);
+        }
+
+        private void expandNode(Node node) {
+            List<Move> moves = node.board.getMovesFor(node.lastMoverColor);
+            Color moverColor = getOpponent(node.lastMoverColor);
+            int nextDepth = node.depth + 1;
+            Move leaderMove = leaders.get(node.board);
+            for (Move move : moves) {
+                node.board.doMove(move);
+                if (!leaders.containsKey(node.board)) {
+                    addNode(node.board, moverColor, nextDepth);
+                    if (leaderMove != null) leaders.put(node.board, leaderMove);
+                    else leaders.put(node.board, move);
+                }
+                node.board.undoMove(move);
+            }
+            node.expanded = true; // TODO: Remove expanded node
+        }
+
+        private class Node {
+            public Node(Board board, Color lastMoverColor, int depth, boolean leaf) {
+                this.board = board;
+                this.lastMoverColor = lastMoverColor;
+                this.depth = depth;
+                this.leaf = leaf;
+            }
+            public Board board;
+            public int depth;
+            public Color lastMoverColor;
+            public boolean leaf;
+            public boolean expanded = false;
+        }
+
+        public class ExhaustedException extends Throwable {}
+    }
+
+    public interface Heuristic {
+        int measure(Board b, Color myColor);
+    }
 }
