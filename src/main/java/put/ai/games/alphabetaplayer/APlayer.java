@@ -183,6 +183,9 @@ public class APlayer extends Player {
      */
     public float heuristiDistFromCenter(Board boardIn,Player.Color myPlayerColor){//mozna przyspieszyc poprzez dodanie tablicy myPieces
 
+        if(boardIn.getWinner(myPlayerColor)==myPlayerColor){//jesli ruch wygrywa
+            return -Float.MAX_VALUE;
+        }
 
         distMyPlayer=0;
         boardSize=boardIn.getSize();
@@ -202,7 +205,7 @@ public class APlayer extends Player {
         }
 
 
-        return distMyPlayer- distEnemyPlayer;
+        return  distMyPlayer-distEnemyPlayer;
     }
 
 
