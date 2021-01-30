@@ -16,6 +16,7 @@ import put.ai.games.linesofaction.LinesOfActionMove;
 
 public class AlphaBetaPlayer extends Player {
     private final Random random = new Random(0xdeadbeef);
+    private int depth = 1;
 
     @Override
     public String getName() {
@@ -32,7 +33,11 @@ public class AlphaBetaPlayer extends Player {
                 timeLow[0].set(false);
             }
         }, getTime() - 100);
-        return new AlphaBeta(b, getColor(), () -> timeLow[0].get(), random).process();
+
+        AlphaBeta alphaBeta = new AlphaBeta(b, getColor(), () -> timeLow[0].get(), depth);
+        Move move = alphaBeta.process();
+        depth = Math.max(1, alphaBeta.getDepth() - 3);
+        return move;
     }
 
     public interface TimeWatchdog {
@@ -41,30 +46,27 @@ public class AlphaBetaPlayer extends Player {
 
     public static class TimeoutException extends RuntimeException {}
 
-    private static class AlphaBeta {
+    private class AlphaBeta {
         private final TimeWatchdog watchdog;
         private final Board board;
         private final Color me;
-        private final Random random;
         private final MovePoller poller;
-        private Move bestMove;
         private int depth;
+        private Move bestMove;
         private final Set<Board> dopedMyBoards = new HashSet<>();
         private final Set<Board> dopedOpBoards = new HashSet<>();
         private final BoardIndexer indexer;
 
-        public AlphaBeta(Board board, Color me, TimeWatchdog watchdog, Random random) {
+        public AlphaBeta(Board board, Color me, TimeWatchdog watchdog, int depth) {
             this.board = board.clone();
             this.watchdog = watchdog;
             this.me = me;
-            this.random = random;
+            this.depth = depth;
             this.poller = new MovePoller(me);
-            this.depth = 1;
             this.indexer = new BoardIndexer();
         }
 
         public Move process() {
-            depth = Math.max(1, depth - 3);
             Move bestDepthMove = null;
             this.poller.setMaxDepth(Integer.MAX_VALUE);
             try {
@@ -84,6 +86,10 @@ public class AlphaBetaPlayer extends Player {
                 return moves.get(random.nextInt(moves.size()));
             }
             return bestDepthMove;
+        }
+
+        public int getDepth() {
+            return depth;
         }
 
         private float run(Color color, int depth, float alpha, float beta)
