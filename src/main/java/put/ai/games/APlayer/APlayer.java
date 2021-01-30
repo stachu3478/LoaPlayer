@@ -2,7 +2,7 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package put.ai.games.alphabetaplayer;
+package put.ai.games.APlayer;
 
 import java.util.List;
 
@@ -33,10 +33,15 @@ public class APlayer extends Player {
     private Move alpha(Board b) {
         List<Move> myMoves = b.getMovesFor(getColor());
         Move bestMove = myMoves.get(0);
-        int bestRank = Integer.MIN_VALUE;
+
+        //int bestRank = Integer.MIN_VALUE;
+        float bestRank=-Float.MAX_VALUE;
         boolean replaced = false;
+        Heuristics heuristicsObject=new Heuristics();
         for (Move m : myMoves) {
-            int r = rank(b, m);
+            //int r = rank(b, m);
+            float r=heuristicsObject.heuristiDistFromCenter(b.clone(),getColor(),m);
+            System.out.println(r);
             if (r > bestRank) {
                 bestRank = r;
                 bestMove = m;
@@ -44,8 +49,11 @@ public class APlayer extends Player {
             }
         }
         if (bestRank == 0) System.out.println("Warning: Zero valued rank");
-        if (!replaced) System.out.println("Warning: Zero indexed move");
-        System.out.println("test");
+        if (!replaced)
+            System.out.println("Warning: Zero indexed move");
+        else
+            System.out.println("Heuristiv move");
+        //System.out.println("test");
         return bestMove;
     }
 
@@ -167,46 +175,51 @@ public class APlayer extends Player {
         }
 
     }
+    class Heuristics{
+        private  int x;
+        private  int y;
+        private  int boardSize;
+        float distMyPlayer, distEnemyPlayer;
+        Player.Color myPlayerColor;
 
+        //AlphaBetaPlayer player=new AlphaBetaPlayer();
+        /**
+         * podajesz tablice z pionkami i kolor gracza, a funkcja okresla heurystyczna ocene danego stanu dla danego koloru gracza
+         */
+        public float heuristiDistFromCenter(Board boardIn,Player.Color myPlayerColor, Move m){//mozna przyspieszyc poprzez dodanie tablicy myPieces
+            boardIn.doMove(m);
+            if(boardIn.getWinner(myPlayerColor)==myPlayerColor){//jesli ruch wygrywa
+                return -Float.MAX_VALUE;
+            }
+
+            distMyPlayer=0;
+            distEnemyPlayer=0;
+            boardSize=boardIn.getSize();
+            int center=Math.floorDiv(boardSize,2);
+            for(int i=0;i<boardSize;i++){
+                for(int j=0 ;j<boardSize;j++){
+                    if(boardIn.getState(i,j)==myPlayerColor)
+                    {
+                        distMyPlayer+=Math.sqrt(Math.pow((i-center),2)+Math.pow((j-center),2));
+                    }
+                    else if(boardIn.getState(i,j)==Player.getOpponent(myPlayerColor)){
+
+                        distEnemyPlayer +=Math.sqrt(Math.pow((i-center),2)+Math.pow((j-center),2));
+                    }
+                    //System.out.println(distMyPlayer);
+                }
+            }
+
+            boardIn.undoMove(m);
+            //System.out.println(distMyPlayer);
+            //System.out.println(distEnemyPlayer);
+            //System.out.println("stop");
+
+            return  -(distMyPlayer-distEnemyPlayer);
+        }
 
 }
-  class Heuristics{
-    private  int x;
-    private  int y;
-    private  int boardSize;
-    float distMyPlayer, distEnemyPlayer;
-    Player.Color myPlayerColor;
 
-    //AlphaBetaPlayer player=new AlphaBetaPlayer();
-    /**
-     * podajesz tablice z pionkami i kolor gracza, a funkcja okresla heurystyczna ocene danego stanu dla danego koloru gracza
-     */
-    public float heuristiDistFromCenter(Board boardIn,Player.Color myPlayerColor){//mozna przyspieszyc poprzez dodanie tablicy myPieces
-
-        if(boardIn.getWinner(myPlayerColor)==myPlayerColor){//jesli ruch wygrywa
-            return -Float.MAX_VALUE;
-        }
-
-        distMyPlayer=0;
-        boardSize=boardIn.getSize();
-        int center=Math.floorDiv(boardSize,2);
-        for(int i=0;i<boardSize;i++){
-            for(int j=0 ;j<boardSize;j++){
-            if(boardIn.getState(i,j)==myPlayerColor)
-            {
-                distMyPlayer+=Math.sqrt((i-center)^2+(i-center)^2);
-            }
-            else if(boardIn.getState(i,j)==Player.getOpponent(myPlayerColor)){
-
-                distEnemyPlayer +=Math.sqrt((i-center)^2+(i-center)^2);
-            }
-
-            }
-        }
-
-
-        return  distMyPlayer-distEnemyPlayer;
-    }
 
 
 
