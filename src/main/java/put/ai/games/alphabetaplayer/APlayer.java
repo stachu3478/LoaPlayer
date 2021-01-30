@@ -4,14 +4,13 @@
  */
 package put.ai.games.alphabetaplayer;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
+
 import put.ai.games.game.Board;
 import put.ai.games.game.Move;
 import put.ai.games.game.Player;
 
-public class AlphaBetaPlayer extends Player {
+public class APlayer extends Player {
     private BoardIndexer indexer;
     private boolean init = false;
 
@@ -71,7 +70,7 @@ public class AlphaBetaPlayer extends Player {
         return state;
     }
 
-    private static class BoardIndexer {
+    private  class BoardIndexer {
         private final int[] mixRows;
         private final int[] mixCols;
         private final int[] mixLurdWedges;
@@ -145,7 +144,7 @@ public class AlphaBetaPlayer extends Player {
             }
         }
 
-        private static class Walker {
+        private  class Walker {
             private final int x;
             private final int y;
             private final int boardSize;
@@ -166,5 +165,46 @@ public class AlphaBetaPlayer extends Player {
                 return 0;
             }
         }
+
     }
+
+
+}
+  class Heuristics{
+    private  int x;
+    private  int y;
+    private  int boardSize;
+    float distMyPlayer, distEnemyPlayer;
+    Player.Color myPlayerColor;
+
+    //AlphaBetaPlayer player=new AlphaBetaPlayer();
+    /**
+     * podajesz tablice z pionkami i kolor gracza, a funkcja okresla heurystyczna ocene danego stanu dla danego koloru gracza
+     */
+    public float heuristiDistFromCenter(Board boardIn,Player.Color myPlayerColor){//mozna przyspieszyc poprzez dodanie tablicy myPieces
+
+
+        distMyPlayer=0;
+        boardSize=boardIn.getSize();
+        int center=Math.floorDiv(boardSize,2);
+        for(int i=0;i<boardSize;i++){
+            for(int j=0 ;j<boardSize;j++){
+            if(boardIn.getState(i,j)==myPlayerColor)
+            {
+                distMyPlayer+=Math.sqrt((i-center)^2+(i-center)^2);
+            }
+            else if(boardIn.getState(i,j)==Player.getOpponent(myPlayerColor)){
+
+                distEnemyPlayer +=Math.sqrt((i-center)^2+(i-center)^2);
+            }
+
+            }
+        }
+
+
+        return distMyPlayer- distEnemyPlayer;
+    }
+
+
+
 }
