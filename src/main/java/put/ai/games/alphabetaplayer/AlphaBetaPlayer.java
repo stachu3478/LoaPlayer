@@ -15,8 +15,6 @@ import put.ai.games.linesofaction.LinesOfActionMove;
 
 public class AlphaBetaPlayer extends Player {
     private final Random random = new Random(0xdeadbeef);
-    private Color me;
-    private Board board;
 
     @Override
     public String getName() {
@@ -25,8 +23,6 @@ public class AlphaBetaPlayer extends Player {
 
     @Override
     public Move nextMove(Board b) {
-        me = getColor();
-        board = b.clone();
         Timer timer = new Timer();
         final AtomicBoolean[] timeLow = {new AtomicBoolean(true)};
         timer.schedule(new TimerTask() {
@@ -74,6 +70,7 @@ public class AlphaBetaPlayer extends Player {
                     System.out.println("Best val: " + bestVal);
                     if (bestMove != null) bestDepthMove = bestMove;
                     if (bestVal == Float.MAX_VALUE) return bestDepthMove;
+                    if (bestVal == -Float.MAX_VALUE) return bestDepthMove;
                     depth++;
                 }
             } catch (TimeoutException e) {
@@ -95,16 +92,16 @@ public class AlphaBetaPlayer extends Player {
             }
             Set<Board> dopedBoards = getDopedBoards(color);
             if (!dopedBoards.add(board)) return alpha;
-            Color winner = indexer.getWinner(color, getOpponent(color));
+            Color winner = board.getWinner(color);
             if (winner != null) {
                 dopedBoards.remove(board);
                 return winner == color ? Float.MAX_VALUE : -Float.MAX_VALUE;
             }
-            List<Move> moves = indexer.getMovesFor(color, getOpponent(color));
             if( depth == 0 ) {
                 dopedBoards.remove(board);
                 return indexer.heuri(color); //color == me ? poll : -poll;
             }
+            List<Move> moves = board.getMovesFor(color);
             for(Move move : moves) {
                 indexer.doMove((LinesOfActionMove) move);
                 float val = -run(getOpponent(color), depth - 1, -beta, -alpha);
@@ -113,7 +110,7 @@ public class AlphaBetaPlayer extends Player {
                     if (this.depth == depth) bestMove = move;
                     alpha = val; // alpha=max(val,alpha);
                 }
-                if( alpha >= beta ) {
+                if( alpha == Float.MAX_VALUE ) {
                     dopedBoards.remove(board);
                     return beta; // cutoff
                 }
@@ -149,20 +146,30 @@ public class AlphaBetaPlayer extends Player {
                 makeBoardSnapshot(board);
             }
 
-            public int heuri(Color c) {
+            public float heuri(Color c) {
                 if (c == me) return distanceSum(opPieces) - distanceSum(myPieces);
                 return distanceSum(myPieces) - distanceSum(opPieces);
             }
 
-            private int distanceSum(List<MooPoint> pieces) {
-                int d = 0;
+            private float distanceSum(List<MooPoint> pieces) {
+                float connections = 0;
+                float wx = 0;
+                float wy = 0;
                 for (MooPoint p1 : pieces) {
+                    wx += p1.getX();
+                    wy += p1.getY();
                     for (MooPoint p2 : pieces) {
-                        if (p1 == p2) continue;
-                        d += Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY()) - p2.getY());
+                        if (Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY() - p2.getY())) <= 1) connections--;
                     }
                 }
-                return d;
+                connections /= pieces.size();
+                connections *= boardSize;
+                wx /= pieces.size();
+                wy /= pieces.size();
+                for (MooPoint p1 : pieces) {
+                    connections += Math.hypot(p1.getX() - wx, p1.getY() - wy);
+                }
+                return connections;
             }
 
             private void makeBoardSnapshot(Board b) {
@@ -247,106 +254,6 @@ public class AlphaBetaPlayer extends Player {
                 mixCols[x] += val;
                 mixLurdWedges[boardSize + x - y] += val;
                 mixLdruWedges[x + y] += val;
-            }
-
-            public Color getWinner(Color me, Color op) {
-                if (winning(myPieces)) return me;
-                if (winning(opPieces)) return op;
-                return null;
-            }
-
-            private boolean winning(List<MooPoint> pieces) {
-                int connectedCountdown = pieces.size() - 1;
-                if (connectedCountdown <= 0) return true;
-                Set<MooPoint> closed = new HashSet<>();
-                closed.add(pieces.get(0));
-                List<MooPoint> connectedPieces = new ArrayList<>();
-                connectedPieces.add(pieces.get(0));
-                while (!connectedPieces.isEmpty()) {
-                    List<MooPoint> newPieces = new ArrayList<>();
-                    for (MooPoint p1 : connectedPieces) {
-                        for (MooPoint p2 : pieces) {
-                            if (p1 == p2) continue;
-                            if (closed.contains(p2)) continue;
-                            if (Math.max(Math.abs(p1.getX() - p2.getX()), Math.abs(p1.getY() - p2.getY())) == 1) {
-                                newPieces.add(p2);
-                                closed.add(p2);
-                                connectedCountdown--;
-                                if (connectedCountdown == 0) return true;
-                            }
-                        }
-                    }
-                    connectedPieces = newPieces;
-                }
-                return false;
-            }
-
-            public List<Move> getMovesFor(Color color, Color blocker) {
-                List<Move> moves = new ArrayList<>();
-                List<MooPoint> pieces = color == me ? myPieces : opPieces;
-                int maxRand = pieces.size() * 8;
-                int rand = 0;
-                for (int i = 0; i < maxRand; i++) {
-                    rand = (rand + 1) % maxRand;
-                    MooPoint piece = pieces.get(rand / 8);
-                    int x = piece.getX();
-                    int y = piece.getY();
-                    if (boardSnaphot[x][y] != piece) {
-                        System.out.print("?");
-                        continue;
-                    }
-                    if (board.getState(x, y) != color) {
-                        System.out.print("!");
-                        continue;
-                    }
-                    int rest = rand % 8;
-                    int xDir = -1;
-                    int yDir = -1;
-                    int distance = mixLdruWedges[x + y];
-                    if (rest == 0) {
-                        xDir = 0;
-                    } else if (rest == 1) {
-                        xDir = 1;
-                    } else if (rest == 2) {
-                        xDir = 1;
-                        yDir = 0;
-                    } else if (rest == 3) {
-                        xDir = 1;
-                        yDir = 1;
-                    } else if (rest == 4) {
-                        xDir = 0;
-                        yDir = 1;
-                    } else if (rest == 5) {
-                        yDir = 1;
-                    } else if (rest == 6) {
-                        yDir = 0;
-                    }
-
-                    if (xDir == 0) {
-                        distance = mixCols[x];
-                    } else if (yDir == 0) {
-                        distance = mixRows[y];
-                    } else if (xDir != yDir) {
-                        distance = mixLurdWedges[boardSize + x - y];
-                    }
-
-                    int dx = x + distance * xDir;
-                    int dy = y + distance * yDir;
-                    if (dx < 0 || dy < 0 || dx >= boardSize || dy >= boardSize) continue;
-                    Color state = board.getState(x + distance * xDir, y + distance * yDir);
-                    if (state == color) continue; // cannot remove himself
-                    boolean canMove = true;
-                    for (int j = 1; j < distance; j++) { // enemy piece blocks
-                        state = board.getState(x + j * xDir, y + j * yDir);
-                        if (state == blocker)  {
-                            canMove = false;
-                            break;
-                        }
-                    }
-                    if (!canMove) continue;
-                    moves.add(new LinesOfActionMove(color, x, y, dx, dy));
-                }
-                return moves;
             }
 
             private class MooPoint {
