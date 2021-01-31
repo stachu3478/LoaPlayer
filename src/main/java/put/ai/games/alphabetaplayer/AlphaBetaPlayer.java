@@ -28,7 +28,7 @@ public class AlphaBetaPlayer extends Player {
                 timeAvail[0].set(false);
             }
         }, getTime() - 100);
-        A a = new A(b, (_b, _c) -> 0 /* TODO: add heuristic */);
+        A a = new A(b, new Heuristics());
         while (timeAvail[0].get()) {
             try {
                 a.step();
@@ -57,9 +57,12 @@ public class AlphaBetaPlayer extends Player {
                 for (Node node : bestNodes) {
                     if (!node.leaf && !node.expanded) {
                         toBeExpanded = node;
+                        bestNodes.remove(toBeExpanded);
+                        // System.out.print("." + node.val);
                         break;
                     }
                 }
+                if (toBeExpanded != null) break;
             }
             if (toBeExpanded == null) throw new ExhaustedException(); // the tree is fully expanded
             else expandNode(toBeExpanded);
@@ -67,8 +70,14 @@ public class AlphaBetaPlayer extends Player {
 
         public Move findBestMove() {
             for (List<Node> bestNodes : orderedNodes.values()) {
+                //System.out.println("Val: " + bestNodes.get(0).val);
                 for (Node node : bestNodes) {
-                    if (node.lastMoverColor == getColor() && leaders.containsKey(node.board)) return leaders.get(node.board);
+                    if (node.lastMoverColor == getColor()) {
+                        Move move = leaders.get(node.board);
+                        if (move == null) continue;
+                        System.out.println("Selected node: " + node);
+                        return move;
+                    }
                 }
             }
             return null;
@@ -80,59 +89,116 @@ public class AlphaBetaPlayer extends Player {
 
         private void addNode(Board b, Color moverColor, int depth) {
             Color winner = b.getWinner(null);
-            int measurement;
-            boolean leaf = true;
+            int measurement; // funkcja kosztu
+            boolean leaf = winner != null;
             int distanceToNode = depth * distanceBetweenNodes;
-            if (winner == moverColor) measurement = Integer.MAX_VALUE - distanceToNode;
-            else if (winner == getOpponent(moverColor)) measurement = Integer.MIN_VALUE + distanceToNode;
-            else {
-                leaf = false;
-                measurement = heuristic.measure(b, moverColor) + distanceToNode;
-            }
-            measurement = getColor() == moverColor ? measurement : -measurement;
-            insertNode(new Node(b.clone(), moverColor, depth, leaf), measurement);
+            if (winner == getOpponent(moverColor)) measurement = Integer.MAX_VALUE - distanceToNode;
+            else if (winner == moverColor) measurement = Integer.MIN_VALUE + distanceToNode;
+            else measurement = heuristic.measure(b, moverColor) + distanceToNode;
+            insertNode(new Node(b, moverColor, depth, leaf, measurement), measurement);
         }
 
         private void insertNode(Node node, int key) {
             List<Node> nodes = orderedNodes.computeIfAbsent(key, k -> new ArrayList<>());
             nodes.add(node);
+            // System.out.print("->" + key);
         }
 
         private void expandNode(Node node) {
-            List<Move> moves = node.board.getMovesFor(node.lastMoverColor);
             Color moverColor = getOpponent(node.lastMoverColor);
+            List<Move> moves = node.board.getMovesFor(moverColor);
             int nextDepth = node.depth + 1;
             Move leaderMove = leaders.get(node.board);
+            if (leaderMove == null && node.depth > 1) throw new InvalidNodeException();
+            boolean unreachable = false;
+            for (Move move : moves) {
+                node.board.doMove(move);
+                if (node.board.getWinner(null) == moverColor) unreachable = true;
+                node.board.undoMove(move);
+                if (unreachable) {
+                    node.val = Integer.MIN_VALUE + node.depth * distanceBetweenNodes;
+                    node.expanded = true;
+                    node.leaf = true;
+                    node.lastMoverColor = moverColor;
+                    insertNode(node, node.val);
+                    if (leaderMove == null) leaders.put(node.board, move);
+                    return;
+                }
+            }
             for (Move move : moves) {
                 node.board.doMove(move);
                 if (!leaders.containsKey(node.board)) {
-                    addNode(node.board, moverColor, nextDepth);
-                    if (leaderMove != null) leaders.put(node.board, leaderMove);
-                    else leaders.put(node.board, move);
+                    Board boardClone = node.board.clone();
+                    addNode(boardClone, moverColor, nextDepth);
+                    if (nextDepth > 1) leaders.put(boardClone, leaderMove);
+                    else {
+                        leaders.put(boardClone, move);
+                        System.out.println("Add new move " + move);
+                    }
                 }
                 node.board.undoMove(move);
             }
-            node.expanded = true; // TODO: Remove expanded node
+            node.expanded = true;
         }
 
         private class Node {
-            public Node(Board board, Color lastMoverColor, int depth, boolean leaf) {
+            public Node(Board board, Color lastMoverColor, int depth, boolean leaf, int val) {
                 this.board = board;
                 this.lastMoverColor = lastMoverColor;
                 this.depth = depth;
                 this.leaf = leaf;
+                this.val = val;
             }
             public Board board;
             public int depth;
             public Color lastMoverColor;
             public boolean leaf;
             public boolean expanded = false;
+            public int val;
+
+            @Override
+            public String toString() {
+                return "Node{" +
+                        "board=\n" + board +
+                        ", depth=" + depth +
+                        ", lastMoverColor=" + lastMoverColor +
+                        ", leaf=" + leaf +
+                        ", expanded=" + expanded +
+                        ", val=" + val +
+                        '}';
+            }
         }
 
         public class ExhaustedException extends Throwable {}
+        public class InvalidNodeException extends RuntimeException {}
     }
 
     public interface Heuristic {
         int measure(Board b, Color myColor);
+    }
+
+    public class Heuristics implements Heuristic{
+        float distMyPlayer, distEnemyPlayer;
+
+        /**
+         * podajesz tablice z pionkami i kolor gracza, a funkcja okresla heurystyczna ocene danego stanu dla danego koloru gracza
+         */
+        public int measure(Board boardIn, Color myPlayerColor){//mozna przyspieszyc poprzez dodanie tablicy myPieces
+            distMyPlayer=0;
+            distEnemyPlayer=0;
+            int boardSize = boardIn.getSize();
+            int center=Math.floorDiv(boardSize,2);
+            for(int i = 0; i< boardSize; i++){
+                for(int j = 0; j< boardSize; j++){
+                    Color color = boardIn.getState(i,j);
+                    if (color == Color.EMPTY) continue;
+                    double sqrt = Math.hypot(i - center, j - center);
+                    if(color==myPlayerColor)distMyPlayer+= sqrt;
+                    else distEnemyPlayer += sqrt;
+                }
+            }
+
+            return (int) Math.floor(distMyPlayer - distEnemyPlayer);
+        }
     }
 }
